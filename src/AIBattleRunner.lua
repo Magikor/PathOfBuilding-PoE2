@@ -3,6 +3,18 @@
 
 dofile("HeadlessWrapper.lua")
 
+local build = assert(_G.build, "HeadlessWrapper failed to initialize build")
+local newBuild = assert(_G.newBuild, "HeadlessWrapper failed to expose newBuild")
+local runCallback = assert(_G.runCallback, "HeadlessWrapper failed to expose runCallback")
+
+if build.importTab and build.importTab.api and type(build.importTab.api.ValidateAuth) == "function" then
+	build.importTab.api.ValidateAuth = function(_, callback)
+		if callback then
+			callback(true, false)
+		end
+	end
+end
+
 math.randomseed(os.time())
 
 local function addItem(raw)
@@ -105,12 +117,48 @@ local humanBaselines = {
 	},
 }
 
+local availableCustomMods = {
+	"+20% to all elemental resistances",
+	"+20% to chaos resistance",
+	"10% increased Movement Speed",
+	"10% increased attack speed",
+}
+
+local function joinMods(mods)
+	if #mods == 0 then
+		return ""
+	end
+	return table.concat(mods, "\n")
+end
+
+local function randomCustomMods()
+	local selected = {}
+	for i = 1, #availableCustomMods do
+		if math.random() < 0.33 then
+			selected[#selected + 1] = availableCustomMods[i]
+		end
+	end
+	if #selected == 0 and math.random() < 0.4 then
+		selected[1] = availableCustomMods[math.random(1, #availableCustomMods)]
+	end
+	return joinMods(selected)
+end
+
 local function randomCandidate()
 	return {
 		attackDamageInc = math.random(10, 220),
 		critBonus = math.random(20, 260),
 		flatLife = math.random(10, 180),
-		customMods = (math.random() < 0.5) and "+20% to all elemental resistances" or "",
+		customMods = randomCustomMods(),
+	}
+end
+
+local function crossoverCandidate(a, b)
+	return {
+		attackDamageInc = (math.random() < 0.5) and a.attackDamageInc or b.attackDamageInc,
+		critBonus = (math.random() < 0.5) and a.critBonus or b.critBonus,
+		flatLife = (math.random() < 0.5) and a.flatLife or b.flatLife,
+		customMods = (math.random() < 0.5) and a.customMods or b.customMods,
 	}
 end
 
@@ -119,16 +167,20 @@ local function mutateCandidate(parent)
 	nextCfg.attackDamageInc = clamp(nextCfg.attackDamageInc + math.random(-18, 18), 10, 240)
 	nextCfg.critBonus = clamp(nextCfg.critBonus + math.random(-24, 24), 20, 280)
 	nextCfg.flatLife = clamp(nextCfg.flatLife + math.random(-14, 14), 10, 220)
-	if math.random() < 0.15 then
-		nextCfg.customMods = (nextCfg.customMods == "") and "+20% to all elemental resistances" or ""
+	if math.random() < 0.2 then
+		nextCfg.customMods = randomCustomMods()
 	end
 	return nextCfg
 end
 
 local function runEvolution()
-	local generations = 24
-	local populationSize = 80
-	local eliteSize = 10
+	local generations = tonumber(os.getenv("POB2_AI_GENERATIONS")) or 8
+	local populationSize = tonumber(os.getenv("POB2_AI_POPULATION")) or 24
+	local eliteSize = tonumber(os.getenv("POB2_AI_ELITES")) or 6
+
+	if eliteSize > populationSize then
+		eliteSize = populationSize
+	end
 
 	local population = {}
 	for i = 1, populationSize do
@@ -138,6 +190,7 @@ local function runEvolution()
 	local bestResult = nil
 
 	for g = 1, generations do
+		print(string.format("[AIBattleRunner] Generation %d/%d", g, generations))
 		local scored = {}
 		for i = 1, #population do
 			scored[i] = evaluateBuild("ai_g" .. g .. "_" .. i, population[i])
@@ -157,8 +210,10 @@ local function runEvolution()
 		end
 
 		while #nextPopulation < populationSize do
-			local parent = scored[math.random(1, eliteSize)].config
-			nextPopulation[#nextPopulation + 1] = mutateCandidate(parent)
+			local parentA = scored[math.random(1, eliteSize)].config
+			local parentB = scored[math.random(1, eliteSize)].config
+			local child = crossoverCandidate(parentA, parentB)
+			nextPopulation[#nextPopulation + 1] = mutateCandidate(child)
 		end
 
 		population = nextPopulation
@@ -228,7 +283,9 @@ local bestAi = runEvolution()
 
 local winner = (bestAi.score > bestHuman.score) and "AI" or "HUMAN"
 local leadPercent
-if winner == "AI" then
+if bestAi.score <= 0 or bestHuman.score <= 0 then
+	leadPercent = 0
+elseif winner == "AI" then
 	leadPercent = ((bestAi.score / bestHuman.score) - 1) * 100
 else
 	leadPercent = ((bestHuman.score / bestAi.score) - 1) * 100
@@ -238,8 +295,22 @@ print("=== POB2 HEADLESS AI vs HUMAN BATTLE ===")
 print(string.format("Best Human Score (%s): %.2f", bestHuman.label, bestHuman.score))
 print(string.format("Best AI Score (%s): %.2f", bestAi.label, bestAi.score))
 print(string.format("Winner: %s by %.2f%%", winner, leadPercent))
-print(string.format("Human DPS/Life/MaxHit: %.2f / %.2f / %.2f", bestHuman.dps, bestHuman.life, bestHuman.physicalMaximumHitTaken))
-print(string.format("AI DPS/Life/MaxHit: %.2f / %.2f / %.2f", bestAi.dps, bestAi.life, bestAi.physicalMaximumHitTaken))
+print(
+	string.format(
+		"Human DPS/Life/MaxHit: %.2f / %.2f / %.2f",
+		bestHuman.dps,
+		bestHuman.life,
+		bestHuman.physicalMaximumHitTaken
+	)
+)
+print(
+	string.format(
+		"AI DPS/Life/MaxHit: %.2f / %.2f / %.2f",
+		bestAi.dps,
+		bestAi.life,
+		bestAi.physicalMaximumHitTaken
+	)
+)
 
 local report = {
 	generatedAt = os.date("!%Y-%m-%dT%H:%M:%SZ"),
