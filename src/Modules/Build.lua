@@ -165,13 +165,16 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 		end
 		local profileConfigs = {
 			Fast = {
-				generations = 4,
-				populationSize = 12,
-				eliteSize = 3,
+				generations = 3,
+				populationSize = 10,
+				eliteSize = 2,
 				topAscendanciesPerClass = 1,
-				perClassGenerations = 2,
-				perClassPopulation = 8,
+				perClassGenerations = 1,
+				perClassPopulation = 6,
 				perClassElite = 2,
+				maxClassCandidates = 6,
+				maxClassesOptimized = 3,
+				skipHumanGauntlet = true,
 			},
 			Balanced = {
 				generations = 6,
@@ -181,6 +184,8 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 				perClassGenerations = 4,
 				perClassPopulation = 14,
 				perClassElite = 4,
+				maxClassCandidates = 18,
+				maxClassesOptimized = 8,
 			},
 			Deep = {
 				generations = 10,
@@ -193,8 +198,16 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 			},
 		}
 
-		local function runProfile(profileName)
-			local profileOptions = profileConfigs[profileName] or profileConfigs.Balanced
+		local function runProfile(profileName, overrides)
+			local profileOptions = { }
+			for k, v in pairs(profileConfigs[profileName] or profileConfigs.Balanced) do
+				profileOptions[k] = v
+			end
+			if overrides then
+				for k, v in pairs(overrides) do
+					profileOptions[k] = v
+				end
+			end
 			self.aiBattleRunning = true
 			local ok, reportOrErr, outPathOrErr = pcall(function()
 				local report, runErr = aiBattleLib:Run(self, profileOptions)
@@ -254,16 +267,41 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 					return
 				end
 
-				if self.spec:CountAllocNodes() > 0 and not self.spec:IsClassConnected(bestClass.classId) then
-					self.spec:ConnectToClass(bestClass.classId)
+				local appliedSummary = nil
+				if aiBattleLib and type(aiBattleLib.ApplyBestBuild) == "function" then
+					local okApply, result = pcall(function()
+						return aiBattleLib:ApplyBestBuild(self, report)
+					end)
+					if okApply then
+						appliedSummary = result
+					else
+						main:OpenMessagePopup("AI Battle", "Failed to auto-apply full build package:\n" .. tostring(result))
+					end
 				end
 
-				self.spec:SelectClass(bestClass.classId)
-				self.spec:SelectAscendClass(bestClass.ascendClassId)
-				self.spec:AddUndoState()
-				self.spec:SetWindowTitleWithBuildClass()
-				self.buildFlag = true
-				self.treeTab.viewer.searchNeedsForceUpdate = true
+				if not appliedSummary then
+					if self.spec:CountAllocNodes() > 0 and not self.spec:IsClassConnected(bestClass.classId) then
+						self.spec:ConnectToClass(bestClass.classId)
+					end
+
+					self.spec:SelectClass(bestClass.classId)
+					self.spec:SelectAscendClass(bestClass.ascendClassId)
+					self.spec:AddUndoState()
+					self.spec:SetWindowTitleWithBuildClass()
+					self.buildFlag = true
+					self.treeTab.viewer.searchNeedsForceUpdate = true
+					main:OpenMessagePopup("AI Battle", "Applied class/ascendancy only.\n(Full auto-apply was unavailable.)")
+				else
+					main:OpenMessagePopup(
+						"AI Battle",
+						string.format(
+							"Applied full AI build package.\nItems equipped: %d\nSkills added: %d\nPassive nodes allocated: %d",
+							appliedSummary.itemsEquipped or 0,
+							appliedSummary.skillsAdded or 0,
+							appliedSummary.nodesAllocated or 0
+						)
+					)
+				end
 			end)
 		end
 
@@ -273,18 +311,27 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 			main:ClosePopup()
 			runProfile("Fast")
 		end)
+		controls.spell = new("ButtonControl", nil, {-25, 70, 80, 20}, "Spell", function()
+			main:ClosePopup()
+			runProfile("Fast", {
+				preferSpell = true,
+				maxClassCandidates = 8,
+				maxClassesOptimized = 3,
+				skipHumanGauntlet = true,
+			})
+		end)
 		controls.balanced = new("ButtonControl", nil, {-35, 70, 80, 20}, "Balanced", function()
 			main:ClosePopup()
 			runProfile("Balanced")
 		end)
-		controls.deep = new("ButtonControl", nil, {55, 70, 70, 20}, "Deep", function()
+		controls.deep = new("ButtonControl", nil, {65, 70, 70, 20}, "Deep", function()
 			main:ClosePopup()
 			runProfile("Deep")
 		end)
 		controls.cancel = new("ButtonControl", nil, {0, 100, 70, 20}, "Cancel", function()
 			main:ClosePopup()
 		end)
-		main:OpenPopup(340, 130, "AI Battle Profile", controls, "balanced", "balanced", "cancel")
+		main:OpenPopup(380, 130, "AI Battle Profile", controls, "spell", "spell", "cancel")
 	end)
 
 	-- Controls: top bar, right side

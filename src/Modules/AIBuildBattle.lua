@@ -46,7 +46,7 @@ local availableCustomMods = {
 	"10% reduced Mana Cost of Skills",
 }
 
-local defaultSkillGroup = "Lightning Arrow 20/0  1\nMartial Tempo 20/0  1\n"
+local defaultSkillGroup = "Lightning Arrow 20/0  1\n"
 
 local archetypes = {
 	{
@@ -55,7 +55,7 @@ local archetypes = {
 		classNames = { "Ranger", "Mercenary", "Huntress" },
 		weaponBase = "Heavy Bow",
 		offhandBase = "Quiver",
-		skillGroup = "Lightning Arrow 20/0  1\nMartial Tempo 20/0  1\nLightning Infusion 20/0  1\n",
+		skillGroup = "Lightning Arrow 20/0  1\n",
 	},
 	{
 		id = "mace_slam",
@@ -63,7 +63,7 @@ local archetypes = {
 		classNames = { "Warrior" },
 		weaponBase = "Two Handed Mace",
 		offhandBase = "Ring",
-		skillGroup = "Rolling Slam 20/0  1\nMartial Tempo 20/0  1\nRage 20/0  1\n",
+		skillGroup = "Rolling Slam 20/0  1\n",
 	},
 	{
 		id = "wand_spell",
@@ -71,7 +71,7 @@ local archetypes = {
 		classNames = { "Witch", "Sorceress" },
 		weaponBase = "Wand",
 		offhandBase = "Ring",
-		skillGroup = "Spark 20/0  1\nArcane Tempo 20/0  1\nLightning Penetration 20/0  1\n",
+		skillGroup = "Spark 20/0  1\n",
 	},
 	{
 		id = "staff_monk",
@@ -79,7 +79,7 @@ local archetypes = {
 		classNames = { "Monk" },
 		weaponBase = "Quarterstaff",
 		offhandBase = "Ring",
-		skillGroup = "Ice Strike 20/0  1\nMartial Tempo 20/0  1\nPrimal Armament 20/0  1\n",
+		skillGroup = "Ice Strike 20/0  1\n",
 	},
 	{
 		id = "fallback_bow",
@@ -340,7 +340,26 @@ local function addItemWithFallback(build, base, lines, fallbackBase)
 end
 
 local function addSkillSetup(build, skillGroup)
-	build.skillsTab:PasteSocketGroup(skillGroup or defaultSkillGroup)
+	local candidates = {
+		skillGroup,
+		defaultSkillGroup,
+		"Spark 20/0  1\n",
+		"Lightning Arrow 20/0  1\n",
+	}
+
+	for i = 1, #candidates do
+		local value = candidates[i]
+		if value and #value > 0 then
+			local ok = pcall(function()
+				build.skillsTab:PasteSocketGroup(value)
+			end)
+			if ok then
+				return true
+			end
+		end
+	end
+
+	return false
 end
 
 local function evaluateBuild(build, snapshotXml, label, cfg)
@@ -715,6 +734,9 @@ end
 function aiBattleLib:Run(build, options)
 	local _ = self
 	options = options or { }
+	local skipHumanGauntlet = options.skipHumanGauntlet == true
+	local maxClassCandidates = tonumber(options.maxClassCandidates) or 0
+	local maxClassesOptimized = tonumber(options.maxClassesOptimized) or 0
 	local generations = options.generations or 6
 	local populationSize = options.populationSize or 18
 	local eliteSize = options.eliteSize or 5
@@ -766,6 +788,18 @@ function aiBattleLib:Run(build, options)
 	end)
 
 	local classCandidates = getClassCandidates(build)
+	if options.preferSpell then
+		local filteredCandidates = { }
+		for i = 1, #classCandidates do
+			local className = classCandidates[i].className
+			if className == "Witch" or className == "Sorceress" then
+				filteredCandidates[#filteredCandidates + 1] = classCandidates[i]
+			end
+		end
+		if #filteredCandidates > 0 then
+			classCandidates = filteredCandidates
+		end
+	end
 	if #classCandidates == 0 then
 		build:LoadDB(snapshotXml, build.buildName or "AI Battle Snapshot")
 		build.calcsTab:BuildOutput()
@@ -787,6 +821,12 @@ function aiBattleLib:Run(build, options)
 		return a.score > b.score
 	end)
 
+	if maxClassCandidates > 0 and #classProbes > maxClassCandidates then
+		while #classProbes > maxClassCandidates do
+			table.remove(classProbes)
+		end
+	end
+
 	local probesByClass = { }
 	for i = 1, #classProbes do
 		local probe = classProbes[i]
@@ -794,8 +834,30 @@ function aiBattleLib:Run(build, options)
 		t_insert(probesByClass[probe.className], probe)
 	end
 
-	local classBuilds = { }
+	local classOrder = { }
 	for className, probeList in pairs(probesByClass) do
+		table.sort(probeList, function(a, b)
+			return a.score > b.score
+		end)
+		classOrder[#classOrder + 1] = {
+			className = className,
+			bestScore = probeList[1] and probeList[1].score or 0,
+		}
+	end
+	table.sort(classOrder, function(a, b)
+		return a.bestScore > b.bestScore
+	end)
+
+	if maxClassesOptimized > 0 and #classOrder > maxClassesOptimized then
+		while #classOrder > maxClassesOptimized do
+			table.remove(classOrder)
+		end
+	end
+
+	local classBuilds = { }
+	for idx = 1, #classOrder do
+		local className = classOrder[idx].className
+		local probeList = probesByClass[className]
 		table.sort(probeList, function(a, b)
 			return a.score > b.score
 		end)
@@ -860,42 +922,46 @@ function aiBattleLib:Run(build, options)
 	end
 
 	local humanChallengers = { }
-	for className, probeList in pairs(probesByClass) do
-		table.sort(probeList, function(a, b)
-			return (a.robustScore or a.score or 0) > (b.robustScore or b.score or 0)
-		end)
+	if not skipHumanGauntlet then
+		for idx = 1, #classOrder do
+			local className = classOrder[idx].className
+			local probeList = probesByClass[className]
+			table.sort(probeList, function(a, b)
+				return (a.robustScore or a.score or 0) > (b.robustScore or b.score or 0)
+			end)
 
-		for i = 1, m_min(humanAscendanciesPerClass, #probeList) do
-			local humanCandidate = probeList[i]
-			local optimizedHuman, err = optimizeHumanChallenger(
-				build,
-				snapshotXml,
-				humanCandidate,
-				humanGenerations,
-				humanPopulation,
-				humanElite
-			)
-			if not optimizedHuman then
-				build:LoadDB(snapshotXml, build.buildName or "AI Battle Snapshot")
-				build.calcsTab:BuildOutput()
-				return nil, err
+			for i = 1, m_min(humanAscendanciesPerClass, #probeList) do
+				local humanCandidate = probeList[i]
+				local optimizedHuman, err = optimizeHumanChallenger(
+					build,
+					snapshotXml,
+					humanCandidate,
+					humanGenerations,
+					humanPopulation,
+					humanElite
+				)
+				if not optimizedHuman then
+					build:LoadDB(snapshotXml, build.buildName or "AI Battle Snapshot")
+					build.calcsTab:BuildOutput()
+					return nil, err
+				end
+				humanChallengers[#humanChallengers + 1] = {
+					className = className,
+					classId = optimizedHuman.classId,
+					ascendClassId = optimizedHuman.ascendClassId,
+					ascendClassName = optimizedHuman.ascendClassName,
+					score = optimizedHuman.score,
+					robustScore = optimizedHuman.robustScore,
+					dps = optimizedHuman.dps,
+					life = optimizedHuman.life,
+					physicalMaximumHitTaken = optimizedHuman.physicalMaximumHitTaken,
+					archetypeId = optimizedHuman.archetypeId,
+					archetypeName = optimizedHuman.archetypeName,
+					weaponBase = optimizedHuman.weaponBase,
+					offhandBase = optimizedHuman.offhandBase,
+					quality = optimizedHuman.quality,
+				}
 			end
-			humanChallengers[#humanChallengers + 1] = {
-				className = className,
-				classId = optimizedHuman.classId,
-				ascendClassId = optimizedHuman.ascendClassId,
-				ascendClassName = optimizedHuman.ascendClassName,
-				score = optimizedHuman.score,
-				robustScore = optimizedHuman.robustScore,
-				dps = optimizedHuman.dps,
-				life = optimizedHuman.life,
-				physicalMaximumHitTaken = optimizedHuman.physicalMaximumHitTaken,
-				archetypeId = optimizedHuman.archetypeId,
-				archetypeName = optimizedHuman.archetypeName,
-				weaponBase = optimizedHuman.weaponBase,
-				offhandBase = optimizedHuman.offhandBase,
-				quality = optimizedHuman.quality,
-			}
 		end
 	end
 
@@ -954,8 +1020,9 @@ function aiBattleLib:Run(build, options)
 			quality = bestAi.quality,
 		},
 		dominationIndex = dominationIndex,
-		benchmarkType = "adversarial-human-gauntlet",
+		benchmarkType = skipHumanGauntlet and "ai-vs-human-baseline" or "adversarial-human-gauntlet",
 		humanGauntlet = {
+			skipped = skipHumanGauntlet,
 			generations = humanGenerations,
 			population = humanPopulation,
 			elite = humanElite,
@@ -985,4 +1052,343 @@ function aiBattleLib:SaveReport(report, outPath)
 	file:write(encodeJson(report))
 	file:close()
 	return true
+end
+
+local function lowerSafe(value)
+	if type(value) ~= "string" then
+		return ""
+	end
+	return value:lower()
+end
+
+local function addKeywords(out, keywords)
+	if type(keywords) ~= "table" then
+		return
+	end
+	for _, keyword in ipairs(keywords) do
+		if type(keyword) == "string" and keyword ~= "" then
+			table.insert(out, keyword:lower())
+		end
+	end
+end
+
+local function getPassiveKeywords(archetypeId, preferSpell)
+	local keywords = {
+		"maximum life",
+		"elemental resistance",
+		"all elemental resistances",
+	}
+
+	local byArchetype = {
+		wand_spell = { "spell", "cast speed", "elemental damage", "lightning", "cold", "fire", "mana", "energy shield" },
+		bow_crit = { "bow", "projectile", "attack speed", "critical", "critical strike", "evasion" },
+		twohand_slam = { "two handed", "melee", "attack speed", "physical damage", "armour", "stun" },
+		summoner_minion = { "minion", "minions", "mana", "energy shield", "curse", "aura" },
+	}
+
+	if preferSpell then
+		addKeywords(keywords, { "spell", "cast speed", "mana", "energy shield", "elemental" })
+	end
+
+	addKeywords(keywords, byArchetype[archetypeId] or {})
+	return keywords
+end
+
+local function scoreItemForSlot(item, slotName, archetypeId, preferSpell)
+	local title = lowerSafe(item and item.title)
+	local raw = lowerSafe(item and item.raw)
+	local text = title .. "\n" .. raw
+	if text == "\n" then
+		return -math.huge
+	end
+
+	local score = 0
+
+	local function scoreWords(words, weight)
+		for _, word in ipairs(words) do
+			if text:find(word, 1, true) then
+				score = score + weight
+			end
+		end
+	end
+
+	if slotName == "Weapon 1" or slotName == "Weapon 2" then
+		if archetypeId == "wand_spell" then
+			scoreWords({ "wand", "staff", "sceptre", "focus", "spell", "cast speed", "energy shield", "mana", "elemental" }, 6)
+		elseif archetypeId == "bow_crit" then
+			scoreWords({ "bow", "quiver", "projectile", "attack speed", "critical" }, 6)
+		elseif archetypeId == "twohand_slam" then
+			scoreWords({ "mace", "axe", "staff", "two handed", "physical", "melee", "stun" }, 6)
+		elseif archetypeId == "summoner_minion" then
+			scoreWords({ "sceptre", "wand", "staff", "minion", "spell", "mana", "energy shield" }, 6)
+		end
+	elseif slotName == "Helmet" or slotName == "Body Armour" or slotName == "Gloves" or slotName == "Boots" then
+		scoreWords({
+			"maximum life",
+			"all elemental resistances",
+			"elemental resistance",
+			"armour",
+			"evasion",
+			"energy shield",
+		}, 3)
+		if preferSpell or archetypeId == "wand_spell" or archetypeId == "summoner_minion" then
+			scoreWords({ "mana", "energy shield", "cast speed", "spell" }, 2)
+		end
+	elseif slotName == "Amulet" or slotName == "Ring 1" or slotName == "Ring 2" or slotName == "Ring 3" then
+		scoreWords({ "maximum life", "elemental resistance", "all elemental resistances", "attributes" }, 3)
+		if preferSpell or archetypeId == "wand_spell" or archetypeId == "summoner_minion" then
+			scoreWords({ "spell", "cast speed", "mana", "energy shield", "intelligence" }, 3)
+		else
+			scoreWords({ "attack speed", "physical", "critical", "dexterity", "strength" }, 2)
+		end
+	elseif slotName == "Belt" then
+		scoreWords({ "maximum life", "all elemental resistances", "elemental resistance", "strength", "armour" }, 4)
+	elseif slotName == "Flask 1" or slotName == "Flask 2" then
+		scoreWords({ "life", "mana", "charges", "recovery" }, 4)
+	elseif slotName == "Charm 1" or slotName == "Charm 2" or slotName == "Charm 3" then
+		scoreWords({ "resistance", "life", "energy shield", "duration" }, 3)
+	elseif slotName == "Arm 1" or slotName == "Arm 2" or slotName == "Leg 1" or slotName == "Leg 2" then
+		scoreWords({ "armour", "evasion", "energy shield", "life", "resistance" }, 3)
+	end
+
+	return score
+end
+
+local function getNowMs()
+	if type(_G.GetTime) == "function" then
+		return _G.GetTime()
+	end
+	return math.floor(os.clock() * 1000)
+end
+
+function aiBattleLib:ApplyBestBuild(build, report)
+	local _ = self
+	local applyStartMs = getNowMs()
+	local itemBudgetMs = 900
+	local passiveBudgetMs = 900
+	local maxItemChecksPerSlot = 220
+	local maxPassiveCandidates = 240
+	local maxPassiveAttempts = 120
+	local summary = {
+		itemsEquipped = 0,
+		skillsAdded = 0,
+		nodesAllocated = 0,
+	}
+
+	if not build or not report then
+		return summary
+	end
+
+	local bestClass = report.bestClass or {}
+	local bestLoadout = report.bestLoadout or {}
+	local preferSpell = report.profile and report.profile.preferSpell
+	local archetypeId = bestLoadout.archetypeId or "wand_spell"
+	local archetype = getArchetypeById(archetypeId)
+
+	local spec = build.spec
+	if spec and bestClass.classId then
+		pcall(function()
+			spec:SelectClass(bestClass.classId)
+			if bestClass.ascendClassId then
+				spec:SelectAscendClass(bestClass.ascendClassId)
+			end
+		end)
+	end
+
+	local itemsTab = build.itemsTab
+	local appMain = _G.main
+	if itemsTab and itemsTab.activeItemSet and appMain and appMain.itemDB and appMain.itemDB.list then
+		local slotOrder = {
+			"Weapon 1",
+			"Weapon 2",
+			"Helmet",
+			"Body Armour",
+			"Gloves",
+			"Boots",
+			"Amulet",
+			"Ring 1",
+			"Ring 2",
+			"Ring 3",
+			"Belt",
+			"Charm 1",
+			"Charm 2",
+			"Charm 3",
+			"Flask 1",
+			"Flask 2",
+			"Arm 1",
+			"Arm 2",
+			"Leg 1",
+			"Leg 2",
+		}
+
+		local usedItemIds = {}
+		for _, slotName in ipairs(slotOrder) do
+			if getNowMs() - applyStartMs > itemBudgetMs then
+				break
+			end
+			if itemsTab.activeItemSet[slotName] then
+				local bestItem
+				local bestScore = -math.huge
+				local checks = 0
+
+				for _, item in ipairs(appMain.itemDB.list) do
+					if checks >= maxItemChecksPerSlot then
+						break
+					end
+					if getNowMs() - applyStartMs > itemBudgetMs then
+						break
+					end
+					if item and item.id and not usedItemIds[item.id] then
+						checks = checks + 1
+						local isValid = false
+						pcall(function()
+							isValid = itemsTab:IsItemValidForSlot(item, slotName, itemsTab.activeItemSet)
+						end)
+						if isValid then
+							local score = scoreItemForSlot(item, slotName, archetypeId, preferSpell)
+							if score > bestScore then
+								bestScore = score
+								bestItem = item
+							end
+						end
+					end
+				end
+
+				if bestItem then
+					local equipped = false
+					if itemsTab.slots and itemsTab.slots[slotName] and itemsTab.slots[slotName].SetSelItemId then
+						pcall(function()
+							itemsTab.slots[slotName]:SetSelItemId(bestItem.id)
+							equipped = true
+						end)
+					end
+					if not equipped then
+						itemsTab.activeItemSet[slotName].selItemId = bestItem.id
+						equipped = true
+					end
+					if equipped then
+						usedItemIds[bestItem.id] = true
+						summary.itemsEquipped = summary.itemsEquipped + 1
+					end
+				end
+			end
+		end
+	end
+
+	local skillsTab = build.skillsTab
+	if skillsTab then
+		local before = skillsTab.socketGroupList and #skillsTab.socketGroupList or 0
+		local groupsToTry = {}
+		if type(bestLoadout.skillGroup) == "string" and bestLoadout.skillGroup ~= "" then
+			table.insert(groupsToTry, bestLoadout.skillGroup)
+		end
+		if archetype
+			and type(archetype.skillGroup) == "string"
+			and archetype.skillGroup ~= ""
+			and archetype.skillGroup ~= bestLoadout.skillGroup then
+			table.insert(groupsToTry, archetype.skillGroup)
+		end
+		if preferSpell then
+			table.insert(groupsToTry, "Storm Wave\nArcane Tempo\nControlled Destruction")
+			table.insert(groupsToTry, "Spark\nArcane Tempo\nPersistence")
+			table.insert(groupsToTry, "Fireball\nArcane Tempo\nConcentrated Effect")
+		end
+
+		for _, skillGroup in ipairs(groupsToTry) do
+			pcall(function()
+				skillsTab:PasteSocketGroup(skillGroup)
+			end)
+		end
+
+		local after = skillsTab.socketGroupList and #skillsTab.socketGroupList or before
+		summary.skillsAdded = math.max(0, after - before)
+	end
+
+	if spec and spec.nodes then
+		pcall(function()
+			spec:ResetNodes()
+			if bestClass.classId and not spec:IsClassConnected(bestClass.classId) then
+				spec:ConnectToClass(bestClass.classId)
+			end
+			if bestClass.classId then
+				spec:SelectClass(bestClass.classId)
+			end
+			if bestClass.ascendClassId then
+				spec:SelectAscendClass(bestClass.ascendClassId)
+			end
+		end)
+
+		local targetNodes = 30
+		if report.profile and type(report.profile.nodesToAllocate) == "number" then
+			targetNodes = math.max(10, math.min(80, math.floor(report.profile.nodesToAllocate)))
+		end
+
+		local keywords = getPassiveKeywords(archetypeId, preferSpell)
+		local candidates = {}
+		for _, node in pairs(spec.nodes) do
+			if #candidates >= maxPassiveCandidates then
+				break
+			end
+			if getNowMs() - applyStartMs > (itemBudgetMs + passiveBudgetMs) then
+				break
+			end
+			if node
+				and node.id
+				and node.sd
+				and not node.alloc
+				and not node.ascendancyName
+				and node.type ~= "ClassStart"
+				and node.type ~= "AscendClassStart" then
+				local nodeText = lowerSafe(node.sd)
+				local nodeScore = 0
+				for _, keyword in ipairs(keywords) do
+					if nodeText:find(keyword, 1, true) then
+						nodeScore = nodeScore + 2
+					end
+				end
+				if node.type == "Notable" then
+					nodeScore = nodeScore + 3
+				elseif node.type == "Keystone" then
+					nodeScore = nodeScore + 2
+				end
+				if nodeScore > 0 then
+					table.insert(candidates, { node = node, score = nodeScore })
+				end
+			end
+		end
+
+		table.sort(candidates, function(a, b)
+			return a.score > b.score
+		end)
+
+		local passiveAttempts = 0
+		for _, entry in ipairs(candidates) do
+			if summary.nodesAllocated >= targetNodes then
+				break
+			end
+			if passiveAttempts >= maxPassiveAttempts then
+				break
+			end
+			if getNowMs() - applyStartMs > (itemBudgetMs + passiveBudgetMs) then
+				break
+			end
+			passiveAttempts = passiveAttempts + 1
+			local allocated = false
+			pcall(function()
+				allocated = spec:AllocNode(entry.node)
+			end)
+			if allocated then
+				summary.nodesAllocated = summary.nodesAllocated + 1
+			end
+		end
+	end
+
+	build.buildFlag = true
+	if build.calcsTab then
+		pcall(function()
+			build.calcsTab:BuildOutput()
+		end)
+	end
+
+	return summary
 end
