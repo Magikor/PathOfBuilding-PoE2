@@ -2,204 +2,743 @@
 -- Item data (c) Grinding Gear Games
 local itemBases = ...
 
+itemBases["Hayoxi's Soul Core of Heatproofing"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Zalatl's Soul Core of Insulation"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Topotante's Soul Core of Dampening"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Atmohua's Soul Core of Retreat"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Quipolatl's Soul Core of Flow"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Tzamoto's Soul Core of Ferocity"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Uromoti's Soul Core of Attenuation"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Opiloti's Soul Core of Assault"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Guatelitzi's Soul Core of Endurance"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Xopec's Soul Core of Power"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Estazunti's Soul Core of Convalescence"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Tacati's Soul Core of Affliction"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Cholotl's Soul Core of War"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Citaqualotl's Soul Core of Foulness"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Xipocado's Soul Core of Dominion"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_tier3 = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
 itemBases["Soul Core of Tacati"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier1 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier1 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 15% chance to Poison on Hit\nArmour: +7% to Chaos Resistance",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Opiloti"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier1 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier1 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 15% chance to cause Bleeding on Hit\nArmour: 10% increased Charm Charges gained",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Jiquani"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier2 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Recover 2% of Life on Kill\nArmour: 2% increased maximum Life",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Zalatl"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier2 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Recover 2% of Mana on Kill\nArmour: 2% increased maximum Mana",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Citaqualotl"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier1 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier1 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 30% increased Elemental Damage with Attacks\nArmour: +5% to all Elemental Resistances",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Puhuarte"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier3 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 30% increased chance to Ignite\nArmour: +1% to Maximum Fire Resistance",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Tzamoto"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier3 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 20% increased Freeze Buildup\nArmour: +1% to Maximum Cold Resistance",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Xopec"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier3 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 30% increased chance to Shock\nArmour: +1% to Maximum Lightning Resistance",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Azcapa"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier3 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: +15 to Spirit\nArmour: 10% increased Rarity of Items found",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Topotante"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier1 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier1 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Attacks with this Weapon Penetrate 15% Elemental Resistances\nArmour: 15% increased Elemental Ailment Threshold",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Quipolatl"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier2 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 5% increased Attack Speed\nArmour: 10% reduced Slowing Potency of Debuffs on You",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Ticaba"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier2 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: +12% to Critical Damage Bonus\nArmour: Hits against you have 10% reduced Critical Damage Bonus",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Atmohua"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier2 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Convert 20% of Requirements to Strength\nArmour: Convert 20% of Requirements to Strength",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Cholotl"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier2 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Convert 20% of Requirements to Dexterity\nArmour: Convert 20% of Requirements to Dexterity",
 	req = { level = 35, },
 }
 itemBases["Soul Core of Zantipi"] = {
 	type = "SoulCore",
-	hidden = true,
-	tags = { soul_core = true, soul_core_tier2 = true, default = true, },
+	tags = { default = true, soul_core = true, soul_core_tier2 = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Convert 20% of Requirements to Intelligence\nArmour: Convert 20% of Requirements to Intelligence",
 	req = { level = 35, },
+}
+itemBases["Amanamu's Gaze"] = {
+	type = "SoulCore",
+	tags = { abyssal_eye = true, default = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Kurgal's Gaze"] = {
+	type = "SoulCore",
+	tags = { abyssal_eye = true, default = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Tecrod's Gaze"] = {
+	type = "SoulCore",
+	tags = { abyssal_eye = true, default = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Ulaman's Gaze"] = {
+	type = "SoulCore",
+	tags = { abyssal_eye = true, default = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Jiquani's Thesis"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_vaal = true },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Quipolatl's Thesis"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_vaal = true },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Guatelitzi's Thesis"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_vaal = true },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Citaqualotl's Thesis"] = {
+	type = "SoulCore",
+	tags = { default = true, soul_core = true, soul_core_vaal = true },
+	implicitModTypes = { },
+	req = { level = 65, },
 }
 
 itemBases["Desert Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Adds 7 to 11 Fire Damage\nArmour: +12% to Fire Resistance",
-	req = { level = 5, },
+	req = { level = 31, },
 }
 itemBases["Glacial Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Adds 6 to 10 Cold Damage\nArmour: +12% to Cold Resistance",
-	req = { level = 5, },
+	req = { level = 31, },
 }
 itemBases["Storm Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Adds 1 to 20 Lightning Damage\nArmour: +12% to Lightning Resistance",
-	req = { level = 5, },
+	req = { level = 31, },
 }
 itemBases["Iron Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: 20% increased Physical Damage\nArmour: 20% increased Armour, Evasion and Energy Shield",
-	req = { level = 5, },
+	req = { level = 31, },
 }
 itemBases["Body Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Leeches 3% of Physical Damage as Life\nArmour: +25 to maximum Life",
-	req = { level = 16, },
+	req = { level = 37, },
 }
 itemBases["Mind Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Leeches 2% of Physical Damage as Mana\nArmour: +20 to maximum Mana",
-	req = { level = 16, },
+	req = { level = 37, },
 }
 itemBases["Rebirth Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Gain 20 Life per Enemy Killed\nArmour: Regenerate 0.3% of Life per second",
-	req = { level = 30, },
+	req = { level = 45, },
 }
 itemBases["Inspiration Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Gain 10 Mana per Enemy Killed\nArmour: 15% increased Mana Regeneration Rate",
-	req = { level = 30, },
+	req = { level = 45, },
 }
 itemBases["Stone Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: Causes 25% increased Stun Buildup\nArmour: +40 to Stun Threshold",
-	req = { level = 21, },
+	req = { level = 41, },
 }
 itemBases["Vision Rune"] = {
 	type = "Rune",
-	hidden = true,
-	tags = { default = true, },
+	tags = { default = true, rune = true, rune_normal = true, },
 	implicitModTypes = { },
-	implicit = "Martial Weapons: +100 to Accuracy Rating\nArmour: 10% increased Life and Mana Recovery from Flasks",
-	req = { level = 33, },
+	req = { level = 41, },
+}
+itemBases["Lesser Desert Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Lesser Glacial Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Lesser Storm Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Lesser Iron Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Lesser Body Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 11, },
+}
+itemBases["Lesser Mind Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 11, },
+}
+itemBases["Lesser Rebirth Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 21, },
+}
+itemBases["Lesser Inspiration Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 21, },
+}
+itemBases["Lesser Stone Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 16, },
+}
+itemBases["Lesser Vision Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 16, },
+}
+itemBases["Greater Desert Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Greater Glacial Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Greater Storm Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Greater Iron Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Greater Body Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 57, },
+}
+itemBases["Greater Mind Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 57, },
+}
+itemBases["Greater Rebirth Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 62, },
+}
+itemBases["Greater Inspiration Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 62, },
+}
+itemBases["Greater Stone Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 59, },
+}
+itemBases["Greater Vision Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 59, },
+}
+itemBases["Lesser Robust Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Robust Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_normal = true, },
+	implicitModTypes = { },
+	req = { level = 31, },
+}
+itemBases["Greater Robust Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Lesser Adept Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Adept Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_normal = true, },
+	implicitModTypes = { },
+	req = { level = 31, },
+}
+itemBases["Greater Adept Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Lesser Resolve Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Resolve Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_normal = true, },
+	implicitModTypes = { },
+	req = { level = 31, },
+}
+itemBases["Greater Resolve Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Lesser Tempered Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_lesser = true, },
+	implicitModTypes = { },
+	req = { level = 5, },
+}
+itemBases["Tempered Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_normal = true, },
+	implicitModTypes = { },
+	req = { level = 31, },
+}
+itemBases["Greater Tempered Rune"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, rune_greater = true, },
+	implicitModTypes = { },
+	req = { level = 52, },
+}
+itemBases["Greater Rune of Leadership"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Greater Rune of Tithing"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Greater Rune of Alacrity"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Greater Rune of Nobility"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Hedgewitch Assandra's Rune of Wisdom"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Saqawal's Rune of the Sky"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Fenumus' Rune of Agony"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Farrul's Rune of Grace"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Farrul's Rune of the Chase"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Craiceann's Rune of Warding"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Saqawal's Rune of Memory"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Saqawal's Rune of Erosion"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Farrul's Rune of the Hunt"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Craiceann's Rune of Recovery"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Courtesan Mannan's Rune of Cruelty"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Thane Grannell's Rune of Mastery"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Fenumus' Rune of Spinning"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Countess Seske's Rune of Archery"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Thane Girt's Rune of Wildness"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Fenumus' Rune of Draining"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Thane Myrk's Rune of Summer"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Lady Hestra's Rune of Winter"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["Thane Leld's Rune of Spring"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["The Greatwolf's Rune of Claws"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+itemBases["The Greatwolf's Rune of Willpower"] = {
+	type = "Rune",
+	tags = { default = true, rune = true, },
+	implicitModTypes = { },
+	req = { level = 65, },
+}
+
+itemBases["Idol of Sirrius"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, vivid_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Idol of Thruldana"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, primal_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Idol of Grold"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, wild_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Idol of Eeshta"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, primal_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Idol of Egrin"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, vivid_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Idol of Maxarius"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, vivid_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Idol of Ralakesh"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, primal_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Snake Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, primal_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Primate Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, primal_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Owl Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, primal_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Cat Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, vivid_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Wolf Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, vivid_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Stag Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, vivid_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Boar Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, wild_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Bear Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, wild_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Ox Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, wild_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Rabbit Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, sacred_idol = true, },
+	implicitModTypes = { },
+	req = { },
+}
+itemBases["Fox Idol"] = {
+	type = "Idol",
+	tags = { default = true, idol = true, sacred_idol = true, },
+	implicitModTypes = { },
+	req = { },
 }

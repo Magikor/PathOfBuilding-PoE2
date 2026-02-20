@@ -11,6 +11,15 @@ Wrapped Greathelm
 (5-15)% increased Dexterity
 (5-15)% increased Intelligence
 ]],[[
+Blood Price
+Fierce Greathelm
+League: Dawn of the Hunt
+(80-120)% increased Armour
+(10-15) Life Regeneration per second
++(100-150) to Stun Threshold
+(30-60)% increased Presence Area of Effect
+Enemies in your Presence have at least 10% of Life Reserved
+]],[[
 Corona of the Red Sun
 Warrior Greathelm
 Variant: Pre 0.1.1
@@ -19,7 +28,7 @@ Variant: Current
 +(60-80) to maximum Life
 {variant:2}+(20-25)% to Fire Resistance
 25% increased Light Radius
-When you Leech Life from a Hit, Allies in your Presence also Leech the same amount of Life
+Leeching Life from your Hits causes Allies in your Presence to also Leech the same amount of Life
 ]],[[
 Deidbell
 Elite Greathelm
@@ -28,8 +37,7 @@ Variant: Current
 (60-100)% increased Armour
 {variant:2}+(10-20) to Strength
 (20-30)% increased Warcry Speed
-Corpses in your Presence Explode when you Warcry,
-dealing 10% of their Life as Physical Damage
+Warcries Explode Corpses dealing 10% of their Life as Physical Damage
 Warcry Skills have (20-30)% increased Area of Effect
 ]],[[
 Ezomyte Peak
@@ -76,6 +84,26 @@ Armoured Cap
 +(50-75)% to Cold Resistance
 Presence Radius is doubled
 ]],[[
+The Black Insignia
+Corsair Cap
+League: Dawn of the Hunt
+(70-100)% increased Evasion Rating
+(10-20)% increased Rarity of Items found
++(15-25)% to Lightning Resistance
+Gain Tailwind on Critical Hit, no more than once per second
+Lose all Tailwind when Hit
+]],[[
+Constricting Command
+Viper Cap
+League: Dawn of the Hunt
+Variant: Pre 0.3.0
+Variant: Current
++(80-120) to maximum Life
++(10-15) to all Attributes
+(8-12) Life Regeneration per second
+{variant:1}Pin Enemies which are Primed for Pinning
+{variant:2}Require (2-4) fewer enemies to be Surrounded
+]],[[
 Elevore
 Hunter Hood
 Variant: Pre 0.1.1
@@ -91,6 +119,15 @@ Felt Cap
 +(30-50) to Evasion Rating
 10% increased Rarity of Items found
 +(25-35)% to all Elemental Resistances
+]],[[
+Heatshiver
+Velvet Cap
+League: Dawn of the Hunt
+(50-70)% increased Evasion Rating
++(60-100) to maximum Mana
++(20-30)% to Fire Resistance
++(20-30)% to Cold Resistance
+Gain 1% of Cold damage as Extra Fire damage per 1% Chill Magnitude on enemy
 ]],[[
 Innsmouth
 Shabby Hood
@@ -115,15 +152,39 @@ Lace Hood
 +(15-25)% to Fire Resistance
 30% increased Light Radius
 Enemies in your Presence are Ignited as though dealt 100 Base Fire Damage
+]],[[
+Starkonja's Head
+Leatherbound Hood
+League: Dawn of the Hunt
+(100-200)% increased Evasion Rating
+(15-25)% increased Critical Hit Chance
++(30-40) to Dexterity
+150% increased Global Evasion Rating when on Low Life
+15% of Damage from Hits is taken from your Damageable Companion's Life before you
 ]],
 -- Helmet: Energy Shield
 [[
 Atziri's Disdain
 Gold Circlet
-+(40-60) to maximum Mana
-(10-20)% increased Rarity of Items found
-(20-25)% of Damage taken bypasses Energy Shield
-Gain (25-30)% of Maximum Life as Extra Maximum Energy Shield
+Variant: 0.2.0
+Variant: Current
+{variant:1}+(40-60) to maximum Mana
+{variant:2}+(60-100) to maximum Mana
+{variant:1}(10-20)% increased Rarity of Items found
+{variant:2}(10-15)% increased Rarity of Items found
+{variant:1}(20-25)% of Damage taken bypasses Energy Shield
+{variant:2}10% of Damage taken bypasses Energy Shield
+{variant:1}Gain (25-30)% of maximum Life as Extra maximum Energy Shield
+{variant:2}Gain (10-15)% of maximum Life as Extra maximum Energy Shield
+]],[[
+Crown of Eyes
+Vermeil Circlet
+League: Dawn of the Hunt
+(100-140)% increased Energy Shield
++(150-200) to Accuracy Rating
++(10-15) to all Attributes
+-10% to Fire Resistance
+Increases and Reductions to Spell damage also apply to Attacks
 ]],[[
 Crown of Thorns
 Twig Circlet
@@ -140,10 +201,11 @@ Variant: Current
 {variant:2}+(40-60) to maximum Life
 +(10-20) to Intelligence
 +(13-19)% to Chaos Resistance
-Every 3 seconds, Consume a nearby Corpse to Recover 20% of Life
+Every 3 seconds, Consume a nearby Corpse to Recover 20% of maximum Life
 ]],[[
 Forbidden Gaze
 Chain Tiara
+Source: No longer obtainable
 Variant: Pre 0.1.1
 Variant: Current
 (60-100)% increased Energy Shield
@@ -151,6 +213,20 @@ Variant: Current
 {variant:1}+(25-35)% to Cold Resistance
 {variant:2}+(30-50)% to Cold Resistance
 25% reduced Light Radius
+]],[[
+Indigon
+Magus Tiara
+League: Dawn of the Hunt
+Variant: Pre 0.4.0
+Variant: Current
+{variant:1}(60-100)% increased Energy Shield
+{variant:2}(100-140)% increased Energy Shield
++(80-120) to maximum Mana
+{variant:1}(35-50)% increased Cost of Skills for each 200 total Mana Spent Recently
+{variant:2}(5-10)% increased Cost of Skills for each 200 total Mana Spent Recently
+{variant:1}(35-50)% increased Spell damage for each 200 total Mana you have Spent Recently
+{variant:2}(10-15)% increased Spell damage for each 200 total Mana you have Spent Recently
+Mana Recovery other than Regeneration cannot Recover Mana
 ]],[[
 Mask of the Stitched Demon
 Feathered Tiara
@@ -161,10 +237,25 @@ Regenerate 0.05 Life per second per Maximum Energy Shield
 ]],[[
 Sandstorm Visage
 Chain Tiara
+Source: Drops from unique{Zarokh, the Temporal}
+Variant: Pre 0.2.0
+Variant: Pre 0.4.0
+Variant: Current
 +(80-120) to maximum Energy Shield
 +(20-30) to Dexterity
 Enemies in your Presence are Blinded
-Enemies in your Presence gain Critical Weakness every second
+{variant:1}Every second, inflicts Critical Weakness on enemies in your Presence for 1 second
+{variant:2}Every second, inflicts Critical Weakness on enemies in your Presence for 15 seconds
+{variant:3}Every second, inflicts Critical Weakness on enemies in your Presence for (15-20) seconds
+]],[[
+Scold's Bridle
+Jade Tiara
+League: Dawn of the Hunt
++(75-150) to maximum Energy Shield
+(60-100)% increased Spell Damage
++(80-100) to maximum Mana
+15% reduced Cast Speed
+Take (25-100)% of Mana Costs you pay for Skills as Physical Damage
 ]],[[
 Visage of Ayah
 Beaded Circlet
@@ -180,10 +271,29 @@ Eldritch Battery
 [[
 Assailum
 Closed Helm
-(50-100)% increased Armour and Evasion
+Source: Drops from unique{Kosis, The Revelation}
+Variant: Pre 0.4.0
+Variant: Current
+{variant:1}(50-100)% increased Armour and Evasion
+{variant:2}(200-300)% increased Armour and Evasion
 +(200-400) to Accuracy Rating
 (30-50)% increased Critical Hit Chance
 Skills have a (100-150)% longer Perfect Timing window
+]],[[
+The Bringer of Rain
+Decorated Helm
+League: Dawn of the Hunt
+Variant: Pre 0.2.1
+Variant: Pre 0.4.0
+Variant: Current
+(600-800)% increased Armour and Evasion
++(200-300) to Accuracy Rating
+{variant:2,3}100% increased Critical Hit Chance
+(30-60) Life Regeneration per second
+Can't use Body Armour
+You can wield Two-Handed Axes, Maces and Swords in one hand
+{variant:3}This item gains bonuses from Socketed Items as though it was a Body Armour
+{variant:3}Has 4 Augment Sockets
 ]],[[
 Erian's Cobble
 Guarded Helm
@@ -222,10 +332,13 @@ Variant: Current
 ]],[[
 Greymake
 Brimmed Helm
+Variant: Pre 0.4.0
+Variant: Current
 +(30-50) to Strength
 +(30-50) to Dexterity
 +(30-50) to Intelligence
 -1 to all Attributes per Level
+{variant:2}Has 4 Augment Sockets
 ]],[[
 Ironride
 Visored Helm
@@ -265,7 +378,7 @@ Variant: Current
 {variant:1}+(40-60) to maximum Life
 {variant:2}+100 to maximum Life
 (35-50)% reduced Effect of Chill on you
-(35-50)% reduced effect of Ignite on you
+(35-50)% reduced Magnitude of Ignite on you
 (35-50)% reduced effect of Shock on you
 ]],[[
 Cornathaum
@@ -283,23 +396,44 @@ Variant: Current
 +(40-80) to maximum Life
 10% increased Rarity of Items found
 {variant:2}(10-15) to (20-25) Physical Thorns damage
-Thorns damage is triggered by all Hits
+Thorns can Retaliate against all Hits
 ]],[[
 Crown of the Victor
 Iron Crown
-(10-20)% increased Rarity of Items found
-Gain 10 Life per Enemy Killed
-Gain 10 Mana per Enemy Killed
+Variant: Pre 0.2.0
+Variant: Current
+{variant:1}(10-20)% increased Rarity of Items found
+{variant:2}(10-15)% increased Rarity of Items found
+Gain 10 Life per enemy killed
+Gain 10 Mana per enemy killed
 +1 to Level of all Skills
+]],[[
+The Deepest Tower
+Spiritbone Crown
+Source: No longer obtainable
+League: Dawn of the Hunt
+(70-130)% increased Armour and Energy Shield
++(70-100) to maximum Life
++(17-23)% to Chaos Resistance
+50% reduced Presence Area of Effect
+10% reduced Light Radius
+Enemies in your Presence count as being on Low Life
 ]],[[
 Keeper of the Arc
 Spiritbone Crown
-(100-150)% increased Armour and Energy Shield
+Source: Drops from unique{Olroth, Origin of the Fall}
+Variant: Pre 0.4.0
+Variant: Current
+{variant:1}(100-150)% increased Armour and Energy Shield
+{variant:2}(150-250)% increased Armour and Energy Shield
 (15-25) Life Regeneration per second
 (15-25)% increased Mana Regeneration Rate
-Alternating every 5 seconds:
-Take 30% less Damage from Hits
-Take 30% less Damage over time
+{variant:1}Alternating every 5 seconds:
+{variant:2}Alternating every 5 seconds:
+{variant:1}Take 30% more Damage from Hits
+{variant:2}Take 40% less Damage from Hits
+{variant:1}Take 30% more Damage over time
+{variant:2}Take 40% less Damage over time
 ]],[[
 Veil of the Night
 Martyr Crown
@@ -323,13 +457,14 @@ Critical Hits Poison the enemy
 ]],[[
 Glimpse of Chaos
 Tribal Mask
+Source: Drops from unique{Trialmaster} in normal{The Trial of Chaos}
 Can be modified while Corrupted
 +(50-150) to maximum Life
 +(50-150) to maximum Mana
 +(-30-30)% to Fire Resistance
 +(-30-30)% to Cold Resistance
 +(-30-30)% to Lightning Resistance
-Chaos Resistance is Zero
+Chaos Resistance is zero
 ]],[[
 The Hollow Mask
 Hewn Mask
@@ -350,29 +485,60 @@ Allies in your Presence deal 50% increased Damage
 {variant:2}+(10-20) to Dexterity
 25% reduced Damage
 ]],[[
+Mask of the Sanguimancer
+Face Mask
++(20-25) to Evasion Rating
++(10-15) to maximum Energy Shield
+(20-40)% increased Critical Hit Chance for Spells
++(10-20) to Strength
++(10-20) to Intelligence
+Blood Magic
+]],[[
+Mind of the Council
+Death Mask
+League: Dawn of the Hunt
+Variant: Pre 0.4.0
+Variant: Current
+{variant:1}(60-90)% increased Evasion and Energy Shield
+{variant:2}(150-200)% increased Evasion and Energy Shield
++(60-90) to maximum Mana
++(20-30)% to Lightning Resistance
+Attacks cost an additional 6% of your maximum Mana
+Attacks have Added maximum Lightning Damage equal to (6-9)% of maximum Mana
+]],[[
 The Three Dragons
 Solid Mask
 (40-60)% increased Evasion and Energy Shield
 +(10-20)% to all Elemental Resistances
-Fire Damage from Hits Contributes to Shock Chance instead of Ignite Chance and Magnitude
-Cold Damage from Hits Contributes to Ignite Chance and Magnitude instead of Chill Magnitude
+Fire Damage from Hits Contributes to Shock Chance instead of Flammability and Ignite Magnitudes
+Cold Damage from Hits Contributes to Flammability and Ignite Magnitudes instead of Chill Magnitude or Freeze Buildup
 Lightning Damage from Hits Contributes to Freeze Buildup instead of Shock Chance
 ]],[[
 The Vertex
 Tribal Mask
+Variant: Pre 0.4.0
+Variant: Equipment
+Variant: Skill Gems
 (100-150)% increased Evasion and Energy Shield
 (20-30)% increased Critical Hit Chance
 +(13-17)% to Chaos Resistance
-Equipment and Skill Gems have 50% reduced Attribute Requirements
+{variant:2}Equipment has no Attribute Requirements
+{variant:3}Skill Gems have no Attribute Requirements
+{variant:1}Equipment and Skill Gems have 50% reduced Attribute Requirements
 ]],
 -- Helmet: Armour/Evasion/Energy Shield
 [[
 Solus Ipse
 Grand Visage
+Source: Drops from unique{Arbiter of Ash} in normal{The Burning Monolith}
+Variant: Pre 0.4.0
+Variant: Current
+{variant:1}(100-150)% increased Armour, Evasion and Energy Shield
+{variant:2}(150-200)% increased Armour, Evasion and Energy Shield
 +(60-100) to maximum Mana
 25% increased Light Radius
-(100-150)% increased Armour, Evasion and Energy Shield
 Equipment and Skill Gems have 25% increased Attribute Requirements
-You can use two copies of the same Support Gem in different Skills
+{variant:1}You can Socket an additional copy of each Lineage Support Gem, in different Skills
+{variant:2}You can Socket 2 additional copies of each Lineage Support Gem, in different Skills
 ]],
 }

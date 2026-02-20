@@ -42,6 +42,19 @@ if launch.devMode and profiler == nil then
 	ConPrintf("Unable to Load Profiler")
 end
 
+-- Optimize coroutines to run at full framerate
+local co_create = coroutine.create
+local active_coroutines = setmetatable({}, { __mode = "k" })
+function coroutine.create(func)
+	local co = co_create(func)
+	active_coroutines[co] = true
+	return co
+end
+
+function coroutine._list()
+	return active_coroutines
+end
+
 -- Class library
 common.classes = { }
 local function addSuperParents(class, parent)
@@ -248,6 +261,7 @@ function sanitiseText(text)
 		:gsub("\226\128\148", "-") -- U+2014 EM DASH
 		:gsub("\226\128\149", "-") -- U+2015 HORIZONTAL BAR
 		:gsub("\226\136\146", "-") -- U+2212 MINUS SIGN
+		:gsub("\226\128\162 ?", "") -- U+2022 BULLET
 		:gsub("\195\164", "a") -- U+00E4 LATIN SMALL LETTER A WITH DIAERESIS
 		:gsub("\195\182", "o") -- U+00F6 LATIN SMALL LETTER O WITH DIAERESIS
 		-- single-byte: Windows-1252 and similar
@@ -1024,4 +1038,15 @@ end
 
 function getHashFromString(string)
 	return common.sha1(string)
+end
+
+-- Returns virtual screen size
+function GetVirtualScreenSize()
+	local width, height = GetScreenSize()
+	local scale = GetScreenScale and GetScreenScale() or 1.0
+	if scale ~= 1.0 then
+		width = math.floor(width / scale)
+		height = math.floor(height / scale)
+	end
+	return width, height
 end

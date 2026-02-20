@@ -27,6 +27,8 @@ local catalystTags = {
 	{ "attribute" },
 }
 
+local minimumReqLevel = { }
+
 local function getCatalystScalar(catalystId, tags, quality)
 	if not catalystId or type(catalystId) ~= "number" or not catalystTags[catalystId] or not tags or type(tags) ~= "table" or #tags == 0 then
 		return 1
@@ -57,7 +59,7 @@ local ItemClass = newClass("Item", function(self, raw, rarity, highQuality)
 end)
 
 local lineFlags = {
-	["custom"] = true, ["enchant"] = true, ["implicit"] = true, ["rune"] = true,
+	["custom"] = true, ["fractured"] = true, ["desecrated"] = true, ["mutated"] = true, ["enchant"] = true, ["implicit"] = true, ["rune"] = true,
 }
 
 -- Special function to store unique instances of modifier on specific item slots
@@ -315,9 +317,22 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 		end
 	end
 	if self.rawLines[l] then
-		self.name = self.rawLines[l]
 		-- Determine if "Unidentified" item
 		local unidentified = false
+		if self.rarity == "UNIQUE" then
+			local unidentifiedBase = data.itemBases[self.rawLines[l]]
+			local identifiedBase = data.itemBases[self.rawLines[l+1]]
+			if unidentifiedBase and not identifiedBase then
+				unidentified = true
+				self.name = "Unidentified item"
+				self.baseName = self.rawLines[l]
+				self.base = unidentifiedBase
+			else
+				self.name = self.rawLines[l]
+			end
+		else
+			self.name = self.rawLines[l]
+		end
 		for _, line in ipairs(self.rawLines) do
 			if line == "Unidentified" then
 				unidentified = true
@@ -345,6 +360,7 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 	self.prefixes = { }
 	self.suffixes = { }
 	self.requirements = { }
+	self.requirements.runeLevel = 0
 	self.requirements.str = 0
 	self.requirements.dex = 0
 	self.requirements.int = 0
@@ -364,10 +380,18 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 			charmBuffLines[line] = nil
 		elseif line == "--------" then
 			self.checkSection = true
+		elseif line == "Sanctified" then
+			self.sanctified = true
+			self.corruptible = false
 		elseif line == "Mirrored" then
 			self.mirrored = true
 		elseif line == "Corrupted" then
 			self.corrupted = true
+		elseif line == "Twice Corrupted" then
+			self.corrupted = true
+			self.doubleCorrupted = true
+		elseif line == "Desecrated Prefix" or line == "Desecrated Suffix" then
+			self.desecrated = true
 		elseif line == "Requirements:" then
 			-- nothing to do
 		else
@@ -421,6 +445,16 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 					self.itemSocketCount = #self.sockets
 				elseif specName == "Rune" then
 					t_insert(self.runes, specVal)
+					local runeLevel = 0
+					local runeData = data.itemMods.Runes[specVal]
+					if runeData then
+						for _, slotData in pairs(runeData) do
+							runeLevel = math.max(runeLevel, slotData.rank[1])
+						end
+					end
+					if runeLevel > 0 and (not self.requirements.runeLevel or runeLevel > self.requirements.runeLevel) then
+						self.requirements.runeLevel = runeLevel
+					end
 				elseif specName == "Radius" and self.type == "Jewel" then
 					self.jewelRadiusLabel = specVal:match("^[%a ]+")
 					if specVal:match("^%a+") == "Variable" then
@@ -469,6 +503,8 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 					self.armourData[specName] = specToNumber(specVal)
 				elseif specName == "Requires Level" then
 					self.requirements.level = specToNumber(specVal)
+					minimumReqLevel = minimumReqLevel or {}
+					table.insert(minimumReqLevel, { name = self.name, level = specVal })
 				elseif specName == "Level" then
 					-- Requirements from imported items can't always be trusted
 					importedLevelReq = specToNumber(specVal)
@@ -554,8 +590,9 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 					self.requirements[specName:sub(1,3):lower()] = specToNumber(specVal)
 				elseif specName == "Critical Hit Range" or specName == "Attacks per Second" or specName == "Weapon Range" or
 				       specName == "Critical Hit Chance" or specName == "Physical Damage" or specName == "Elemental Damage" or
-				       specName == "Chaos Damage" or specName == "Reload Time" or specName == "Chance to Block" or specName == "Block chance" or 
-					   specName == "Armour" or specName == "Energy Shield" or specName == "Evasion" then
+				       specName == "Chaos Damage" or specName == "Fire Damage" or specName == "Cold Damage" or specName == "Lightning Damage" or 
+					   specName == "Reload Time" or specName == "Chance to Block" or specName == "Block chance" or 
+					   specName == "Armour" or specName == "Energy Shield" or specName == "Evasion" or specName == "Requires" then
 					self.hidden_specs = true
 				-- Anything else is an explicit with a colon in it (Fortress Covenant, Pure Talent, etc) unless it's part of the custom name
 				elseif not (self.name:match(specName) and self.name:match(specVal)) then
@@ -597,11 +634,26 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 					end
 					return ""
 				end)
+
+				-- Used to flag Bonded soul core mods
+				if line:find("Bonded:") then
+					modLine.bonded = true
+				end
+
 				if modLine.rune then
 					modLine.enchant = true
 				end
 				if modLine.enchant then
 					modLine.implicit = true
+				end
+				if modLine.desecrated then
+					self.desecrated = true
+				end
+				if modLine.mutated then
+					self.mutated = true
+				end
+				if modLine.fractured then
+					self.fractured = true
 				end
 				local baseName
 				if not self.base and (self.rarity == "NORMAL" or self.rarity == "MAGIC") then
@@ -663,8 +715,7 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 						self.affixes = (self.base.subType and data.itemMods[self.base.type..self.base.subType])
 								or data.itemMods[self.base.type]
 								or data.itemMods.Item
-						self.corruptible = self.base.type ~= "Flask" and self.base.type ~= "Charm" and self.base.type ~= "Rune" and self.base.type ~= "SoulCore"
-						self.clusterJewel = data.clusterJewels and data.clusterJewels.jewels[self.baseName]
+						self.corruptible = self.base.type ~= "Flask" and self.base.type ~= "Charm" and self.base.type ~= "Rune" and self.base.type ~= "SoulCore" and self.base.type ~= "Transcendent Limb"
 						self.requirements.str = self.base.req.str or 0
 						self.requirements.dex = self.base.req.dex or 0
 						self.requirements.int = self.base.req.int or 0
@@ -761,7 +812,7 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 					elseif gameModeStage == "FINDEXPLICIT" then
 						gameModeStage = "DONE"
 					end
-				elseif foundExplicit then
+				elseif foundExplicit or (not foundExplicit and gameModeStage == "EXPLICIT") then
 					modLine.modList = { }
 					modLine.extra = line
 					t_insert(modLines, modLine)
@@ -776,27 +827,163 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 	end
 	-- this will need more advanced logic for jewel sockets in items to work properly but could just be removed as items like this was only introduced during development.
 	if self.base then
-		if self.base.weapon or self.base.armour then
+		if self.base.weapon or self.base.armour or self.base.tags.wand or self.base.tags.staff or self.base.tags.sceptre then
 			local shouldFixRunesOnItem = #self.runes == 0
 
-			for i, modLine in ipairs(self.runeModLines) do
-				local value
-				local strippedModeLine = modLine.line:gsub("(%d%.?%d*)", function(val)
-					value = val
-					return "#"
-				end)
-				for name, runeMods in pairs(data.itemMods.Runes) do
-					local runeValue
-					local runeStrippedModeLine = (self.base.weapon and runeMods.weapon or runeMods.armour)[1]:gsub("(%d%.?%d*)", function(val)
+			-- Form a key value table with the following format
+			-- { [strippedModLine] = { { runeName1, runeValue1 }, etc, }, etc}
+			-- This will be used to more easily grab the relevant runes that combinations will need to be of.
+			-- This could be refactored to only needs to be called once.
+			local statGroupedRunes = { }
+			local broadItemType = self.base.weapon and "weapon" or (self.base.tags.wand or self.base.tags.staff) and "caster" or "armour" -- minor optimisation
+			local specificItemType = self.base.type:lower()
+			for runeName, runeMods in pairs(data.itemMods.Runes) do
+				local addModToGroupedRunes = function (modLine)
+					local runeValue = 1
+					local runeStrippedModLine = modLine:gsub("(%d%.?%d*)", function(val)
 						runeValue = val
 						return "#"
 					end)
-					if strippedModeLine == runeStrippedModeLine then
-						modLine.soulcore = name:match("Soul Core") ~= nil
-						modLine.runeCount = round(value/runeValue)
+					if statGroupedRunes[runeStrippedModLine] == nil then
+						statGroupedRunes[runeStrippedModLine] = { }
+					end
+					t_insert(statGroupedRunes[runeStrippedModLine], { runeName, runeValue });
+				end
+				for slotType, slotMod in pairs(runeMods) do
+					if slotType == broadItemType or slotType == specificItemType then
+						for _, mod in ipairs(slotMod) do
+							addModToGroupedRunes(mod)
+						end
+					end
+				end
+			end
+
+			-- Sort table to ensure first entries are always largest.
+			for _, runes in pairs(statGroupedRunes) do
+				table.sort(runes,  function(a, b) return a[2] > b[2] end)
+			end
+
+			local remainingRunes = self.itemSocketCount
+			for i, modLine in ipairs(self.runeModLines) do
+				local value = 1
+				local strippedModLine = modLine.line:gsub("(%d%.?%d*)", function(val)
+					value = val
+					return "#"
+				end)
+				local groupedRunes = statGroupedRunes[strippedModLine]
+				if groupedRunes then -- found the rune category with the relevant stat.
+					-- First a greedy base is found using the runes in the groupedRunes. If this matches the target value then that set of runes is applied.
+					-- If the greedy base isn't a solution we search all the possible combinations that could lead to a valid combination.
+					-- This done by recursing through all combinations that could lead to a valid value and pruning values that exceed the number
+					-- of runes and solutions that it would be impossible to reach the target value from. Visited combinations are recorded and are used such 
+					-- that candidates are only searched once. This makes for a fairly efficient algorithm that doesn't search unneeded values very much.
+					local function getNumberOfRunesOfEachType(values, target)
+						local function adjustCombination(values, target, result, best, visited, sum, count)
+							-- This is used to avoid unnecessary checks on decrement.
+							local function checkAndAdjustCombination(values, target, result, best, visited, sum, count)
+								-- If it's a valid solution, update best
+								if math.abs(sum-target) <  1e-9 then
+									if not best.count or count < best.count then
+										best.count = count
+										-- Copy solution to avoid side effects from continued searching.
+										local solution = {}
+										for k, v in pairs(result) do
+											solution[k] = v
+										end
+										best.solution = solution
+									end
+									return
+								end
+
+								-- Prune if we already used more runes than the best found
+								if best.count and count >= best.count then return end
+
+								return adjustCombination(values, target, result, best, visited, sum, count)
+							end
+
+							for _, v in ipairs(values) do
+								local function checkUnique(result)
+									-- Generate a unique key from the result table this prevents duplicates combinations being searched
+									local key = ""
+									for value, count in pairs(result) do
+										if count > 0 then
+											key = key .. value .. "x" .. count .. " "
+										end
+									end
+									if visited[key] then 
+										return false 
+									else
+										visited[key] = true
+										return true
+									end
+								end
+								
+								-- Incrementing is done first as to reach the target you will need to add a count as such it should be more efficient.
+								-- Try increasing (if it doesn't overshoot or exceed maximum number of remaining runes)
+								if sum + tonumber(v) <= target + 1e-9 and count < remainingRunes then
+									result[v] = (result[v] or 0) + 1
+									if checkUnique(result) then
+										checkAndAdjustCombination(values, target, result, best, visited, sum + v, count + 1)
+									end
+									result[v] = result[v] - 1
+								end
+
+								-- Try decreasing (if possible and only if target is still reachable).
+								if (result[v] or 0) > 0 and (not best.count or target - 1e-9 < sum - tonumber(v) + values[1] * (best.count - count + 1)) then
+									result[v] = result[v] - 1
+									if checkUnique(result) then
+										adjustCombination(values, target, result, best, visited, sum - v, count - 1)
+									end
+									result[v] = result[v] + 1
+								end
+							end
+						end
+						
+						-- Step 1: Perform greedy search and tests if a single rune is used as these are the most common use case.
+						local greedySolution = {}
+						local leftover = target
+
+						for _, v in ipairs(values) do
+							local count = math.floor(leftover / v)
+							greedySolution[v] = count
+							leftover = leftover - count * v
+						end
+
+						local greedyCount = 0
+						for v, c in pairs(greedySolution) do
+							greedyCount = greedyCount + c
+						end
+						if math.abs(leftover) <= 1e-9 then -- Greedy search found a solution
+							return greedySolution, greedyCount
+						end
+
+						-- Step 2. Perform search starting from the greedy base
+						local best = {count = nil, solution = nil}
+						local visited = {}
+
+						adjustCombination(values, target, greedySolution, best, visited, target - leftover, greedyCount)
+
+						return best.solution, best.count
+					end
+
+					local values = { }
+					for i, runes in ipairs(groupedRunes) do
+						t_insert(values, runes[2])
+					end
+					local result, numRunes = getNumberOfRunesOfEachType(values, tonumber(value))
+
+					if result then -- we have found a valid combo for that rune category
+						remainingRunes = remainingRunes - numRunes
+						-- this code should probably be refactored to based off stored self.runes rather than the recomputed amounts off the runeModLines this 
+						-- is too avoid having to run the relatively expensive recomputation every time the item is parsed even if we know the runes on the item already.
+						modLine.soulCore = groupedRunes[1][1]:match("Soul Core") ~= nil
+						modLine.runeCount = numRunes
+
 						if shouldFixRunesOnItem then
-							for i = 1, modLine.runeCount do
-								t_insert(self.runes, name)
+							for i, rune in ipairs(groupedRunes) do
+								for _ = 1, tonumber(result[rune[2]]) do
+									t_insert(self.runes, groupedRunes[i][1])
+								end
 							end
 						end
 					end
@@ -815,6 +1002,19 @@ function ItemClass:ParseRaw(raw, rarity, highQuality)
 			self.requirements.level = importedLevelReq
 		else
 			self.requirements.level = self.base.req.level
+		end
+	end
+	if self.base and not self.requirements.baseLevel then
+		-- Add only if not already present, to prevent overwriting original value.
+		local exists = false
+		for _, entry in ipairs(minimumReqLevel) do
+			if entry.name == self.title then
+				exists = true
+				break
+			end
+		end
+		if not exists then
+			self.requirements.baseLevel = self.base.req.level
 		end
 	end
 	self.affixLimit = 0
@@ -899,7 +1099,7 @@ function ItemClass:NormaliseQuality()
 		if not self.quality then
 			self.quality = 0
 		elseif not self.uniqueID and not self.corrupted and not self.mirrored and not (self.base.type == "Charm") and self.quality < self.base.quality then -- charms cannot be modified by quality currency.
-			self.quality = self.base.quality
+			self.quality = main.defaultItemQuality
 		end
 	end	
 end
@@ -1000,12 +1200,22 @@ function ItemClass:BuildRaw()
 		if modLine.custom then
 			line = "{custom}" .. line
 		end
+		if modLine.fractured then
+			line = "{fractured}" .. line
+		end
+		if modLine.desecrated then
+			line = "{desecrated}" .. line
+		end
+		if modLine.mutated then
+			line = "{mutated}" .. line
+		end
 		if modLine.variantList then
 			local varSpec
 			for varId in pairs(modLine.variantList) do
 				varSpec = (varSpec and varSpec .. "," or "") .. varId
 			end
-			line = "{variant:" .. varSpec .. "}" .. line
+			local var = "{variant:" .. varSpec .. "}"
+			line = var .. line:gsub("\n", "\n" .. var) -- Variants that go over 1 line need to have the gsub to fix there being no "variant:" at the start
 		end
 		if modLine.modTags and #modLine.modTags > 0 then
 			line = "{tags:" .. table.concat(modLine.modTags, ",") .. "}" .. line
@@ -1047,7 +1257,7 @@ function ItemClass:BuildRaw()
 	if self.quality then
 		t_insert(rawLines, "Quality: " .. self.quality)
 	end
-	if self.itemSocketCount and self.itemSocketCount > 0 and (self.base.weapon or self.base.armour) then
+	if self.itemSocketCount and self.itemSocketCount > 0 then
 		local socketString = ""
 		for _ = 1, self.itemSocketCount do
 			socketString = socketString .. "S "
@@ -1089,7 +1299,12 @@ function ItemClass:BuildRaw()
 	if self.mirrored then
 		t_insert(rawLines, "Mirrored")
 	end
-	if self.corrupted then
+	if self.sanctified then
+		t_insert(rawLines, "Sanctified")
+	end
+	if self.doubleCorrupted then
+		t_insert(rawLines, "Twice Corrupted")
+	elseif self.corrupted then
 		t_insert(rawLines, "Corrupted")
 	end
 	return table.concat(rawLines, "\n")
@@ -1103,31 +1318,53 @@ end
 -- Rebuild rune modifiers using the item's runes
 function ItemClass:UpdateRunes()
 	wipeTable(self.runeModLines)
+	local getModRunesForTypes = function(runeName, baseType, specificType) 
+		local rune = data.itemMods.Runes[runeName]
+		local gatheredRuneMods = { }
+		if rune then
+			if rune[baseType] then
+				-- for _, mod in pairs(rune[baseType]) do
+					t_insert(gatheredRuneMods, rune[baseType])
+				-- end
+			end
+			if rune[specificType] then 
+				-- for _, mod in pairs(rune[specificType]) do
+					t_insert(gatheredRuneMods, rune[specificType])
+				-- end
+			end
+		end
+		return gatheredRuneMods
+	end
+	
 	local statOrder = {}
 	for i = 1, self.itemSocketCount do
 		local name = self.runes[i]
 		if name and name ~= "None" then
-			local mod = self.base.weapon and data.itemMods.Runes[name].weapon or self.base.armour and data.itemMods.Runes[name].armour or { }
-			for i, line in ipairs(mod) do
-				local order = mod.statOrder[i]
-				if statOrder[order] then
-					-- Combine stats
-					local start = 1
-					statOrder[order].line = statOrder[order].line:gsub("%d+", function(num)
-						local s, e, other = line:find("(%d+)", start)
-						start = e + 1
-						return tonumber(num) + tonumber(other)
-					end)
-				else
-					local modLine = { line = line, order = order, rune = true, enchant = true }
-					for l = 1, #self.runeModLines + 1 do
-						if not self.runeModLines[l] or self.runeModLines[l].order > order then
-							t_insert(self.runeModLines, l, modLine)
-							break
+			local baseType = self.base.weapon and "weapon" or self.base.armour and "armour" or (self.base.tags.wand or self.base.tags.staff) and "caster"
+			local specificType = self.base.type:lower()
+			local gatheredMods = getModRunesForTypes(name, baseType, specificType)
+			for _, mod in ipairs(gatheredMods) do
+				for i, modLine in ipairs(mod) do
+					local order = mod.statOrder[i]
+					if statOrder[order] then
+						-- Combine stats
+						local start = 1
+						statOrder[order].line = statOrder[order].line:gsub("(%d%.?%d*)", function(num)
+							local s, e, other = mod[i]:find("(%d%.?%d*)", start)
+							start = e + 1
+							return tonumber(num) + tonumber(other)
+						end)
+					else
+						local modLine = { line = modLine, order = order, rune = true, enchant = true }
+						for l = 1, #self.runeModLines + 1 do
+							if not self.runeModLines[l] or self.runeModLines[l].order > order then
+								t_insert(self.runeModLines, l, modLine)
+								break
+							end
 						end
-					end
-					statOrder[order] = modLine
-				end	
+						statOrder[order] = modLine
+					end	
+				end
 			end
 		end
 	end
@@ -1218,6 +1455,10 @@ function ItemClass:GetPrimarySlot()
 		return "Ring 1"
 	elseif self.type == "Flask" then
 		return "Flask 1"
+	elseif self.base.subType == "Transcendent Leg" then
+		return "Leg 1"
+	elseif self.base.subType == "Transcendent Arm" then
+		return "Arm 1"
 	else
 		return self.type
 	end
@@ -1298,7 +1539,7 @@ function ItemClass:BuildModListForSlotNum(baseList, slotNum)
 	if self.spiritValue then
 		local spiritBase = self.base.spirit + calcLocal(modList, "Spirit", "BASE", 0)
 		local spiritInc = calcLocal(modList, "Spirit", "INC", 0)
-		self.spiritValue = round( spiritBase * (1 + spiritInc / 100) * (1 + ((self.quality or 0) / 100)))
+		self.spiritValue = round( spiritBase * (1 + spiritInc / 100))
 	end
 	if self.charmLimit then
 		self.charmLimit = self.base.charmLimit + calcLocal(modList, "CharmLimit", "BASE", 0)
@@ -1312,8 +1553,12 @@ function ItemClass:BuildModListForSlotNum(baseList, slotNum)
 		weaponData.AttackRate = round(self.base.weapon.AttackRateBase * (1 + weaponData.AttackSpeedInc / 100), 2)
 		weaponData.rangeBonus = calcLocal(modList, "WeaponRange", "BASE", 0) + 10 * calcLocal(modList, "WeaponRangeMetre", "BASE", 0) + m_floor(self.quality / 10 * calcLocal(modList, "AlternateQualityLocalWeaponRangePer10Quality", "BASE", 0))
 		weaponData.range = self.base.weapon.Range + weaponData.rangeBonus
+		if self.base.weapon.ReloadTimeBase then 
+			weaponData.ReloadSpeedInc = calcLocal(modList, "ReloadSpeed", "INC", ModFlag.Attack) + weaponData.AttackSpeedInc
+			weaponData.ReloadTime = round(self.base.weapon.ReloadTimeBase / (1 + weaponData.ReloadSpeedInc / 100), 2)
+		end
 		local LocalIncEle = calcLocal(modList, "LocalElementalDamage", "INC", 0)
-		for _, dmgType in pairs(dmgTypeList) do
+		for _, dmgType in ipairs(dmgTypeList) do
 			local min = (self.base.weapon[dmgType.."Min"] or 0) + calcLocal(modList, dmgType.."Min", "BASE", 0)
 			local max = (self.base.weapon[dmgType.."Max"] or 0) + calcLocal(modList, dmgType.."Max", "BASE", 0)
 			if dmgType == "Physical" then
@@ -1356,7 +1601,7 @@ function ItemClass:BuildModListForSlotNum(baseList, slotNum)
 			end
 		end
 		weaponData.TotalDPS = 0
-		for _, dmgType in pairs(dmgTypeList) do
+		for _, dmgType in ipairs(dmgTypeList) do
 			weaponData.TotalDPS = weaponData.TotalDPS + (weaponData[dmgType.."DPS"] or 0)
 		end
 	elseif self.base.armour then
@@ -1387,7 +1632,7 @@ function ItemClass:BuildModListForSlotNum(baseList, slotNum)
 		armourData.Ward = round((wardBase) * (1 + (wardInc + defencesInc) / 100) * (1 + (qualityScalar / 100)))
 
 		if self.base.armour.BlockChance then
-			armourData.BlockChance = m_floor((self.base.armour.BlockChance + calcLocal(modList, "BlockChance", "BASE", 0)) * (1 + calcLocal(modList, "BlockChance", "INC", 0) / 100))
+			armourData.BlockChance = m_floor((self.base.armour.BlockChance * (1 + calcLocal(modList, "BlockChance", "INC", 0) / 100) + calcLocal(modList, "BlockChance", "BASE", 0)))
 		end
 		if self.base.armour.MovementPenalty then
 			modList:NewMod("MovementSpeed", "BASE", -self.base.armour.MovementPenalty, self.modSource, { type = "Condition", var = "IgnoreMovementPenalties", neg = true })
@@ -1574,6 +1819,58 @@ function ItemClass:BuildModList()
 	for _, modLine in ipairs(self.explicitModLines) do
 		processModLine(modLine)
 	end
+	self.grantedSkills = { }
+	for _, skill in ipairs(baseList:List(nil, "ExtraSkill")) do
+		if skill.name ~= "Unknown" then
+			t_insert(self.grantedSkills, {
+				skillId = skill.skillId,
+				level = skill.level,
+				noSupports = skill.noSupports,
+				source = self.modSource,
+				triggered = skill.triggered,
+				triggerChance = skill.triggerChance,
+			})
+		end
+	end
+
+	local reqLevel = 0
+	local minReqLevel
+
+	for _, entry in ipairs(minimumReqLevel) do
+		if entry.name == self.title then
+			minReqLevel = tonumber(entry.level)
+			break
+		end
+	end
+
+	if #self.grantedSkills >= 1 then
+		local skillDef = data.skills[self.grantedSkills[1].skillId]
+		local gemId = data.gemForSkill[skillDef]
+		local gem = data.gems[gemId]
+
+		local skillLevel = self.grantedSkills[1].level or #skillDef.levels
+		local chosenLevel = skillDef.levels[skillLevel] or skillDef.levels[#skillDef.levels]
+		local gemLevelReq = chosenLevel.levelRequirement
+
+		reqLevel = m_max(gemLevelReq, minReqLevel or 0, self.requirements.runeLevel or 0, self.requirements.baseLevel or 0)
+
+		-- Rune level and unique base level don't scale attribute requirements. Example, Cursecarver has 33 minimum required level
+		-- but the intelligence requirement will be 21 at level 4 skill.
+		local attrLevel = m_max(gemLevelReq, self.requirements.baseLevel or 0)
+
+		if self.base.type == "Sceptre" or self.base.type == "Wand" or self.base.type == "Staff" then
+			self.requirements.int = calcLib.getGemStatRequirement(attrLevel, gem.reqInt)
+			self.requirements.dex = calcLib.getGemStatRequirement(attrLevel, gem.reqDex)
+			self.requirements.str = calcLib.getGemStatRequirement(attrLevel, gem.reqStr)
+		end
+	else
+		-- If no granted skills, we want to use the "Requires Level" from the unique instead of the base armour type level requirement.
+		-- Currently there are no Uniques that use a lower level than the base, but maybe in the future.
+		reqLevel = m_max(minReqLevel or 0, self.requirements.runeLevel or 0, self.requirements.baseLevel or 0)
+	end
+
+	self.requirements.level = reqLevel
+
 	if self.name == "Tabula Rasa, Simple Robe" or self.name == "Skin of the Loyal, Simple Robe" or self.name == "Skin of the Lords, Simple Robe" or self.name == "The Apostate, Cabalist Regalia" then
 		-- Hack to remove the energy shield and base int requirement
 		baseList:NewMod("ArmourData", "LIST", { key = "EnergyShield", value = 0 })
@@ -1598,20 +1895,6 @@ function ItemClass:BuildModList()
 		self.requirements.dexMod = m_floor((self.requirements.dex + calcLocal(baseList, "DexRequirement", "BASE", 0)) * (1 + calcLocal(baseList, "DexRequirement", "INC", 0) / 100))
 		self.requirements.intMod = m_floor((self.requirements.int + calcLocal(baseList, "IntRequirement", "BASE", 0)) * (1 + calcLocal(baseList, "IntRequirement", "INC", 0) / 100))
 	end
-	self.grantedSkills = { }
-	for _, skill in ipairs(baseList:List(nil, "ExtraSkill")) do
-		if skill.name ~= "Unknown" then
-			t_insert(self.grantedSkills, {
-				skillId = skill.skillId,
-				level = skill.level,
-				noSupports = skill.noSupports,
-				source = self.modSource,
-				triggered = skill.triggered,
-				triggerChance = skill.triggerChance,
-			})
-		end
-	end
-
 	if self.itemSocketCount > 0 then
 		-- Ensure that there are the correct number of abyssal sockets present
 		local newSockets = { }
@@ -1627,6 +1910,9 @@ function ItemClass:BuildModList()
 		self.slotModList = { }
 		for i = 1, 2 do
 			self.slotModList[i] = self:BuildModListForSlotNum(baseList, i)
+		end
+		if self.type == "Ring" then
+			self.slotModList[3] = self:BuildModListForSlotNum(baseList, 3)
 		end
 	else
 		self.modList = self:BuildModListForSlotNum(baseList)

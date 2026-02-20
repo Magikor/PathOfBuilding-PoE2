@@ -99,6 +99,12 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 				self.showHeatMap = not self.showHeatMap
 			elseif event.key == "d" and IsKeyDown("CTRL") then
 				self.showStatDifferences = not self.showStatDifferences
+			elseif event.key == "c" and IsKeyDown("CTRL") and self.hoverNode and self.hoverNode.type ~= "Socket" then
+				local result = "# ".. self.hoverNode.dn .. "\n"
+				for _, line in ipairs(self.hoverNode.sd) do
+					result = result .. line .. "\n"
+				end
+				Copy(result)
 			elseif event.key == "PAGEUP" then
 				self:Zoom(IsKeyDown("SHIFT") and 3 or 1, viewPort)
 			elseif event.key == "PAGEDOWN" then
@@ -162,11 +168,11 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 	local offsetY = self.zoomY + viewPort.y + viewPort.height/2
 	local function treeToScreen(x, y)
 		return x * scale + offsetX,
-		       y * scale + offsetY
+			y * scale + offsetY
 	end
 	local function screenToTree(x, y)
 		return (x - offsetX) / scale,
-		       (y - offsetY) / scale
+			(y - offsetY) / scale
 	end
 
 	if IsKeyDown("SHIFT") then
@@ -264,10 +270,44 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 	end
 	
 	local hotkeyPressed = IsKeyDown("1") or IsKeyDown("I") or IsKeyDown("2") or IsKeyDown("S") or IsKeyDown("3") or IsKeyDown("D")
+
+	-- Helper function to determine if global node allocation should be blocked
+	local function shouldBlockGlobalNodeAllocation(node)
+		local isGlobalNode = node.type == "Keystone" or node.type == "Socket" or node.containJewelSocket
+
+		if not isGlobalNode or node.alloc or not node.path then
+			return false
+		end
+
+		local weaponSetMode = spec.allocMode > 0
+		local connectedToWeaponSetNodes = self:IsConnectedToWeaponSetNodes(node)
+
+		-- Only allow allocation from main tree AND node must not be connected to weapon set nodes
+		local shouldBlock = weaponSetMode or connectedToWeaponSetNodes
+
+		return shouldBlock
+	end
+
+	-- Helper function to determine if global node deallocation should be blocked
+	local function shouldBlockGlobalNodeDeallocation(node)
+		local isGlobalNode = node.type == "Keystone" or node.type == "Socket" or node.containJewelSocket
+
+		if not isGlobalNode or not node.alloc then
+			return false
+		end
+
+		-- Main-tree global nodes can only be deallocated from main tree
+		-- Legacy weapon-set global nodes can be deallocated from any mode
+		local shouldBlock = node.allocMode == 0 and spec.allocMode > 0
+
+		return shouldBlock
+	end
+
 	if treeClick == "LEFT" then
 		if hoverNode then
 			-- User left-clicked on a node
-			if hoverNode.alloc then
+			if hoverNode.alloc and not shouldBlockGlobalNodeDeallocation(hoverNode) then
+				-- Handle deallocation of allocated nodes
 				if hoverNode.isAttribute then
 					-- change to other attribute without needing to deallocate
 					if hotkeyPressed then
@@ -283,26 +323,117 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 				end
 				spec:AddUndoState()
 				build.buildFlag = true
-			elseif hoverNode.path then
-				-- Node is unallocated and can be allocated, so allocate it
-				-- attribute switching, unallocated to allocated
-				if hoverNode.isAttribute and not hotkeyPressed then
-					build.treeTab:ModifyAttributePopup(hoverNode)
-				else
-					-- the odd conditional here is so the popup only calls AllocNode inside and to avoid duplicating some code
-					-- same flow for hotkey attribute and non attribute nodes
-					if hotkeyPressed then
-						processAttributeHotkeys(hoverNode.isAttribute)
+			else
+				-- Check if the node belongs to a different ascendancy
+				if hoverNode.ascendancyName then
+					local isDifferentAscendancy = false
+					local targetAscendClassId = nil
+					local targetBaseClassId = nil
+					local targetBaseClass = nil
+					
+					-- Check if it's different from current primary or secondary ascendancy
+					if spec.curAscendClassId == 0 or hoverNode.ascendancyName ~= spec.curAscendClassBaseName then
+						if not (spec.curSecondaryAscendClass and hoverNode.ascendancyName == spec.curSecondaryAscendClass.id) then
+							isDifferentAscendancy = true
+						end
 					end
-					spec:AllocNode(hoverNode, self.tracePath and hoverNode == self.tracePath[#self.tracePath] and self.tracePath)
-					spec:AddUndoState()
-					build.buildFlag = true
+
+					if isDifferentAscendancy then
+						-- First, check if it's in the current class (same-class switching)
+						for ascendClassId, ascendClass in pairs(spec.curClass.classes) do
+							if ascendClass.id == hoverNode.ascendancyName then
+								targetAscendClassId = ascendClassId
+								break
+							end
+						end
+
+						if targetAscendClassId then
+							-- Same-class switching - always allowed
+							spec:SelectAscendClass(targetAscendClassId)
+							spec:AddUndoState()
+							spec:SetWindowTitleWithBuildClass()
+							build.buildFlag = true
+						else
+							-- Cross-class switching - search all classes
+							for classId, classData in pairs(spec.tree.classes) do
+								for ascendClassId, ascendClass in pairs(classData.classes) do
+									if ascendClass.id == hoverNode.ascendancyName then
+										targetBaseClassId = classId
+										targetBaseClass = classData
+										targetAscendClassId = ascendClassId
+										break
+									end
+								end
+								if targetBaseClassId then break end
+							end
+
+							if targetBaseClassId then
+								local used = spec:CountAllocNodes()
+								local clickedAscendNodeId = hoverNode and hoverNode.id
+								local function allocateClickedAscendancy()
+									if not clickedAscendNodeId then
+										return
+									end
+									local targetNode = spec.nodes[clickedAscendNodeId]
+									if targetNode and not targetNode.alloc then
+										spec:AllocNode(targetNode)
+									end
+								end
+
+								-- Allow cross-class switching if: no regular points allocated OR tree is connected to target class
+								if used == 0 or spec:IsClassConnected(targetBaseClassId) then
+									spec:SelectClass(targetBaseClassId)
+									spec:SelectAscendClass(targetAscendClassId)
+									allocateClickedAscendancy()
+									spec:AddUndoState()
+									spec:SetWindowTitleWithBuildClass()
+									build.buildFlag = true
+								else
+									-- Tree has points but isn't connected to target class
+									main:OpenConfirmPopup("Class Change", "Changing class to "..targetBaseClass.name.." will reset your passive tree.\nThis can be avoided by connecting one of the "..targetBaseClass.name.." starting nodes to your tree.", "Continue", function()
+										spec:SelectClass(targetBaseClassId)
+										spec:SelectAscendClass(targetAscendClassId)
+										allocateClickedAscendancy()
+										spec:AddUndoState()
+										spec:SetWindowTitleWithBuildClass()
+										build.buildFlag = true
+									end, "Connect Path", function()
+										if spec:ConnectToClass(targetBaseClassId) then
+											spec:SelectClass(targetBaseClassId)
+											spec:SelectAscendClass(targetAscendClassId)
+											allocateClickedAscendancy()
+											spec:AddUndoState()
+											spec:SetWindowTitleWithBuildClass()
+											build.buildFlag = true
+										end
+									end)
+									return
+								end
+							end
+						end
+					end
+				end
+				if hoverNode.path and not shouldBlockGlobalNodeAllocation(hoverNode) then
+					-- Handle allocation of unallocated nodes
+					if hoverNode.isAttribute and not hotkeyPressed then
+						build.treeTab:ModifyAttributePopup(hoverNode)
+					else
+						-- the odd conditional here is so the popup only calls AllocNode inside and to avoid duplicating some code
+						-- same flow for hotkey attribute and non attribute nodes
+						if hotkeyPressed then
+							processAttributeHotkeys(hoverNode.isAttribute)
+						end
+						spec:AllocNode(hoverNode, self.tracePath and hoverNode == self.tracePath[#self.tracePath] and self.tracePath)
+						spec:AddUndoState()
+						build.buildFlag = true
+					end
 				end
 			end
 		end
 	elseif treeClick == "RIGHT" then
+		-- User right-clicked on a node
 		if hoverNode then
-			if hoverNode.alloc and hoverNode.type == "Socket" then
+			if hoverNode.alloc and (hoverNode.type == "Socket" or hoverNode.containJewelSocket) then
 				local slot = build.itemsTab.sockets[hoverNode.id]
 				if slot:IsEnabled() then
 					-- User right-clicked a jewel socket, jump to the item page and focus the corresponding item slot control
@@ -317,6 +448,14 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 				if hotkeyPressed then
 					processAttributeHotkeys(hoverNode.isAttribute)
 				elseif hoverNode.isAttribute then
+					-- If the attribute node is already set to str, int, or dex create a toggle effect between attrs
+					if hoverNode.dn == "Intelligence" then
+						spec.attributeIndex = 1
+					elseif hoverNode.dn == "Dexterity" then
+						spec.attributeIndex = 3
+					elseif hoverNode.dn == "Strength" then
+						spec.attributeIndex = 2
+					end
 					spec:SwitchAttributeNode(hoverNode.id, spec.attributeIndex or 1)
 				end
 				spec:AllocNode(hoverNode, self.tracePath and hoverNode == self.tracePath[#self.tracePath] and self.tracePath)
@@ -346,7 +485,7 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 	local class = tree.classes[spec.curClassId]
 	if class and class.background then
 		local bgAssetName = class.background.image
-		if spec.curAscendClassId ~= 0 then
+		if spec.curAscendClassId ~= 0 and class.classes[spec.curAscendClassId] then
 			bgAssetName = class.classes[spec.curAscendClassId].background.image
 		end
 		local bg = tree:GetAssetByName(bgAssetName)
@@ -373,7 +512,14 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 	-- draw ascendancies
 	for name, data in pairs(tree.ascendNameMap) do
 		local ascendancy = data.ascendClass
-		if ascendancy.background then
+		local drawn = true
+		if ascendancy.replaceBy and ascendancy.replaceBy == spec.curAscendClassBaseName then
+			drawn = false
+		elseif ascendancy.replace and name ~= spec.curAscendClassBaseName then
+			drawn = false
+		end
+
+		if ascendancy.background and drawn  then
 			local bg = tree:GetAssetByName(ascendancy.background.image)
 			local scrX, scrY = treeToScreen(ascendancy.background.x * tree.scaleImage, ascendancy.background.y * tree.scaleImage)
 			bg.width = ascendancy.background.width
@@ -473,7 +619,7 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 			setConnectorColor(0.75, 0.75, 0.75)
 		end
 		SetDrawColor(unpack(connectorColor))
-		handle = tree:GetAssetByName(connector.type..state).handle
+		handle = tree:GetAssetByName(connector.connectionArt .. connector.type..state).handle
 		DrawImageQuad(handle, unpack(connector.c))
 	end
 
@@ -495,8 +641,9 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 	end
 
 	-- Update cached node data
-	if self.searchStrCached ~= self.searchStr then
+	if self.searchStrCached ~= self.searchStr or self.searchNeedsForceUpdate == true then
 		self.searchStrCached = self.searchStr
+		self.searchNeedsForceUpdate = false
 
 		local function prepSearch(search)
 			search = search:lower()
@@ -590,13 +737,17 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 			else
 				state = "unalloc"
 			end
-			if node.type == "Socket" then
+			if node.type == "Socket" or node.containJewelSocket then
 				-- Node is a jewel socket, retrieve the socketed jewel (if present) so we can display the correct art
 				base = tree:GetAssetByName(node.overlay[state])
 
 				local socket, jewel = build.itemsTab:GetSocketAndJewelForNodeID(nodeId)
 				if isAlloc and jewel then
-					overlay = jewel.baseName
+					if jewel.rarity == "UNIQUE" and jewel.title ~= "Grand Spectrum" then
+						overlay = jewel.title
+					else
+						overlay = jewel.baseName
+					end
 				end
 			elseif node.type == "OnlyImage" then
 				-- This is the icon that appears in the center of many groups
@@ -611,11 +762,7 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 
 				base = tree:GetAssetByName(node.icon)
 
-				overlay = node.overlay[state .. (node.ascendancyName and "Ascend" or "") .. (node.isBlighted and "Blighted" or "")]
-				
-				if node.ascendancyName and tree.secondaryAscendNameMap and tree.secondaryAscendNameMap[node.ascendancyName] then
-					overlay = "Azmeri"..overlay
-				end
+				overlay = node.overlay[state]
 			end
 		end
 
@@ -825,9 +972,10 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 			-- Draw tooltip
 			SetDrawLayer(nil, 100)
 			local size = m_floor(node.size * scale)
-			if self.tooltip:CheckForUpdate(node, self.showStatDifferences, self.tracePath, launch.devModeAlt, build.outputRevision) then
+			if self.tooltip:CheckForUpdate(node, self.showStatDifferences, self.tracePath, launch.devModeAlt, build.outputRevision, build.spec.allocMode) then
 				self:AddNodeTooltip(self.tooltip, node, build, incSmallPassiveSkillEffect)
 			end
+			self.tooltip.center = true
 			self.tooltip:Draw(m_floor(scrX - size), m_floor(scrY - size), size * 2, size * 2, viewPort)
 		end
 	end
@@ -836,7 +984,7 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 	SetDrawLayer(nil, 25)
 	for nodeId in pairs(tree.sockets) do
 		local node = spec.nodes[nodeId]
-		if node and node.name ~= "Charm Socket" and (not node.expansionJewel or node.expansionJewel.size == 2) then
+		if node and node.name ~= "Charm Socket" and node.containJewelSocket ~= true and (not node.expansionJewel or node.expansionJewel.size == 2) then
 			local scrX, scrY = treeToScreen(node.x, node.y)
 			local socket, jewel = build.itemsTab:GetSocketAndJewelForNodeID(nodeId)
 			if node == hoverNode then
@@ -877,10 +1025,10 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 							if keystone and keystone.x and keystone.y then
 								innerSize = 150 * scale
 								local keyX, keyY = treeToScreen(keystone.x, keystone.y)
-								DrawImage(self.jewelShadedOuterRing, keyX - outerSize, keyY - outerSize, outerSize * 2, outerSize * 2)
-								DrawImage(self.jewelShadedOuterRingFlipped, keyX - outerSize, keyY - outerSize, outerSize * 2, outerSize * 2)
-								DrawImage(self.jewelShadedInnerRing, keyX - innerSize, keyY - innerSize, innerSize * 2, innerSize * 2)
-								DrawImage(self.jewelShadedInnerRingFlipped, keyX - innerSize, keyY - innerSize, innerSize * 2, innerSize * 2)
+								self:DrawImageRotated(self.jewelShadedOuterRing, keyX, keyY, outerSize * 2, outerSize * 2,  -0.7)
+								self:DrawImageRotated(self.jewelShadedOuterRingFlipped, keyX, keyY, outerSize * 2, outerSize * 2, 0.7)
+								self:DrawImageRotated(self.jewelShadedInnerRing, keyX, keyY, innerSize * 2, innerSize * 2,  -0.7)
+								self:DrawImageRotated(self.jewelShadedInnerRingFlipped, keyX, keyY, innerSize * 2, innerSize * 2, 0.7)
 							end
 						end
 					elseif jewel.jewelData and jewel.jewelData.conqueredBy and jewel.jewelData.conqueredBy.conqueror and jewel.jewelData.conqueredBy.conqueror.type then
@@ -888,17 +1036,38 @@ function PassiveTreeViewClass:Draw(build, viewPort, inputEvents)
 						if conqueror == "kalguur" then
 							conqueror = "kalguuran"
 						end
-
 						local circle1 = tree:GetAssetByName("art/textures/interface/2d/2dart/uiimages/ingame/passiveskillscreen".. conqueror .."jewelcircle1.dds")
 						local circle2 = tree:GetAssetByName("art/textures/interface/2d/2dart/uiimages/ingame/passiveskillscreen".. conqueror .."jewelcircle2.dds")
-						DrawImage(circle1.handle, scrX - outerSize, scrY - outerSize, outerSize * 2, outerSize * 2, unpack(circle1))
-						DrawImage(circle2.handle, scrX - outerSize, scrY - outerSize, outerSize * 2, outerSize * 2, unpack(circle2))
+						if conqueror == "abyss" then
+							circle1 = tree:GetAssetByName("art/textures/interface/2d/2dart/uiimages/ingame/".. conqueror .."/".. conqueror .."passiveskillscreenjewelcircle1.dds")
+							circle2 = circle1
+						end
+						self:DrawImageRotated(circle1.handle, scrX, scrY, outerSize * 2, outerSize * 2, -0.7, unpack(circle1))
+						self:DrawImageRotated(circle2.handle, scrX, scrY, outerSize * 2, outerSize * 2, 0.7, unpack(circle2))
 					else
-						DrawImage(self.jewelShadedOuterRing, scrX - outerSize, scrY - outerSize, outerSize * 2, outerSize * 2)
-						DrawImage(self.jewelShadedOuterRingFlipped, scrX - outerSize, scrY - outerSize, outerSize * 2, outerSize * 2)
-						DrawImage(self.jewelShadedInnerRing, scrX - innerSize, scrY - innerSize, innerSize * 2, innerSize * 2)
-						DrawImage(self.jewelShadedInnerRingFlipped, scrX - innerSize, scrY - innerSize, innerSize * 2, innerSize * 2)
+						self:DrawImageRotated(self.jewelShadedOuterRing, scrX, scrY, outerSize * 2, outerSize * 2,  -0.7)
+						self:DrawImageRotated(self.jewelShadedOuterRingFlipped, scrX, scrY, outerSize * 2, outerSize * 2, 0.7)
+
+						self:DrawImageRotated(self.jewelShadedInnerRing, scrX, scrY, innerSize * 2, innerSize * 2, -0.7)
+						self:DrawImageRotated(self.jewelShadedInnerRingFlipped, scrX, scrY, innerSize * 2, innerSize * 2, 0.7)
 					end
+				end
+			end
+		end
+	end
+
+	-- Draw ring overlays for other sources of intuitive leap-like effects
+	for _, effectData in ipairs(spec.intuitiveLeapLikeNodes) do
+		local radData = build.data.jewelRadius[effectData.radiusIndex]
+		local outerSize = radData.outer * data.gameConstants["PassiveTreeJewelDistanceMultiplier"] * scale
+		if effectData.from == "Keystone" then
+			for keystoneName, keystoneNode in pairs(spec.tree.keystoneMap) do
+				if keystoneNode and spec.allocNodes[keystoneNode.id]
+					and keystoneName == keystoneNode.name -- keystoneMap contains both TitleCase and lowercase names, so we only need to draw once
+					and keystoneNode.x and keystoneNode.y then
+					local keyX, keyY = treeToScreen(keystoneNode.x, keystoneNode.y)
+					self:DrawImageRotated(self.jewelShadedOuterRing, keyX, keyY, outerSize * 2, outerSize * 2,  -0.7)
+					self:DrawImageRotated(self.jewelShadedOuterRingFlipped, keyX, keyY, outerSize * 2, outerSize * 2, 0.7)
 				end
 			end
 		end
@@ -907,7 +1076,7 @@ end
 
 -- Draws the given asset at the given position
 function PassiveTreeViewClass:DrawAsset(data, x, y, scale, isHalf)
-	if not data then
+	if not data or not data.found then
 		return
 	end
 	if data.width == 0 then
@@ -924,6 +1093,31 @@ function PassiveTreeViewClass:DrawAsset(data, x, y, scale, isHalf)
 	else
 		DrawImage(data.handle, x - width, y - height, width * 2, height * 2, unpack(data))
 	end
+end
+
+function PassiveTreeViewClass:DrawImageRotated(handle, x, y, width, height, angle, ...)
+	if main.showAnimations == false then
+		-- Skip rotation and animation
+		DrawImage(handle, x - width / 2, y - height / 2, width, height, ...)
+		return
+	end
+
+	local t = GetTime() * 0.00003
+	local rot = angle * t
+
+	local hw, hh = width / 2, height / 2
+	local cosA, sinA = math.cos(rot), math.sin(rot)
+
+	local x1 = x - hw * cosA + hh * sinA
+	local y1 = y - hw * sinA - hh * cosA
+	local x2 = x + hw * cosA + hh * sinA
+	local y2 = y + hw * sinA - hh * cosA
+	local x3 = x + hw * cosA - hh * sinA
+	local y3 = y + hw * sinA + hh * cosA
+	local x4 = x - hw * cosA - hh * sinA
+	local y4 = y - hw * sinA + hh * cosA
+
+	DrawImageQuad(handle, x1, y1, x2, y2, x3, y3, x4, y4, ...)
 end
 
 function PassiveTreeViewClass:DrawQuadAndRotate(data, xTree, yTree, angleRad, treeToScreen)
@@ -1026,20 +1220,24 @@ function PassiveTreeViewClass:DoesNodeMatchSearchParams(node)
 	end
 
 	-- Check node description
-	for index, line in ipairs(node.sd) do
-		-- Check display text first
-		err, needMatches = PCall(search, line:lower(), needMatches)
-		if err then return false end
-		if #needMatches == 0 then
-			return true
-		end
-		if #needMatches > 0 and node.mods[index].list then
-			-- Then check modifiers
-			for _, mod in ipairs(node.mods[index].list) do
-				err, needMatches = PCall(search, mod.name, needMatches)
-				if err then return false end
-				if #needMatches == 0 then
-					return true
+	if not node.sd then
+		ConPrintf("Node %d has no sd", node.id)
+	else
+		for index, line in ipairs(node.sd) do
+			-- Check display text first
+			err, needMatches = PCall(search, line:lower(), needMatches)
+			if err then return false end
+			if #needMatches == 0 then
+				return true
+			end
+			if #needMatches > 0 and node.mods[index].list then
+				-- Then check modifiers
+				for _, mod in ipairs(node.mods[index].list) do
+					err, needMatches = PCall(search, mod.name, needMatches)
+					if err then return false end
+					if #needMatches == 0 then
+						return true
+					end
 				end
 			end
 		end
@@ -1050,6 +1248,15 @@ function PassiveTreeViewClass:DoesNodeMatchSearchParams(node)
 	if err then return false end
 	if #needMatches == 0 then
 		return true
+	end
+
+	-- Check unlock ascendancy
+	if node.unlockConstraint then
+		err, needMatches = PCall(search, node.unlockConstraint.ascendancy:lower(), needMatches)
+		if err then return false end
+		if #needMatches == 0 then
+			return true
+		end
 	end
 	
 	-- Check node id for devs
@@ -1063,15 +1270,37 @@ function PassiveTreeViewClass:DoesNodeMatchSearchParams(node)
 end
 
 function PassiveTreeViewClass:AddNodeName(tooltip, node, build)
+	local fontSizeBig = main.showFlavourText and 18 or 16
 	tooltip:SetRecipe(node.infoRecipe)
-	tooltip:AddLine(24, "^7"..node.dn..(launch.devModeAlt and " ["..node.id.."]" or ""))
+	local tooltipMap = {
+		Normal = "PASSIVE",
+		Notable = "NOTABLE",
+		Socket = "JEWEL",
+		Keystone = "KEYSTONE",
+		Ascendancy = "ASCENDANCY",
+	}
+	if (node.type == "Notable" or node.type == "Normal") and node.ascendancyName then
+		tooltip.tooltipHeader = "ASCENDANCY"
+	else
+		tooltip.tooltipHeader = tooltipMap[node.type] or "UNKNOWN"
+	end
+	if node.unlockConstraint then
+		tooltip.tooltipHeader = "ORACLE_" .. tooltip.tooltipHeader
+	end
+	local nodeName = node.dn
+	if main.showFlavourText then
+		nodeName = "^xF8E6CA" .. node.dn
+	end
+	tooltip.center = true
+	tooltip:AddLine(24, nodeName..(launch.devModeAlt and " ["..node.id.."]" or ""), "FONTIN")
+	tooltip.center = false
 	if launch.devModeAlt and node.id > 65535 then
 		-- Decompose cluster node Id
 		local index = band(node.id, 0xF)
 		local size = band(b_rshift(node.id, 4), 0x3)
 		local large = band(b_rshift(node.id, 6), 0x7)
 		local medium = band(b_rshift(node.id, 9), 0x3)
-		tooltip:AddLine(16, string.format("^7Cluster node index: %d, size: %d, large index: %d, medium index: %d", index, size, large, medium))
+		tooltip:AddLine(fontSizeBig, string.format("^7Cluster node index: %d, size: %d, large index: %d, medium index: %d", index, size, large, medium))
 	end
 	if node.type == "Socket" and node.nodesInRadius then
 		local attribTotals = { }
@@ -1082,13 +1311,13 @@ function PassiveTreeViewClass:AddNodeName(tooltip, node, build)
 			end
 		end
 		if attribTotals["Str"] >= 40 then
-			tooltip:AddLine(16, "^7Can support "..colorCodes.STRENGTH.."Strength ^7threshold jewels")
+			tooltip:AddLine(fontSizeBig, "^7Can support "..colorCodes.STRENGTH.."Strength ^7threshold jewels", "FONTIN SC")
 		end
 		if attribTotals["Dex"] >= 40 then
-			tooltip:AddLine(16, "^7Can support "..colorCodes.DEXTERITY.."Dexterity ^7threshold jewels")
+			tooltip:AddLine(fontSizeBig, "^7Can support "..colorCodes.DEXTERITY.."Dexterity ^7threshold jewels", "FONTIN SC")
 		end
 		if attribTotals["Int"] >= 40 then
-			tooltip:AddLine(16, "^7Can support "..colorCodes.INTELLIGENCE.."Intelligence ^7threshold jewels")
+			tooltip:AddLine(fontSizeBig, "^7Can support "..colorCodes.INTELLIGENCE.."Intelligence ^7threshold jewels", "FONTIN SC")
 		end
 	end
 	if node.type == "Socket" and node.alloc then
@@ -1100,8 +1329,11 @@ function PassiveTreeViewClass:AddNodeName(tooltip, node, build)
 end
 
 function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassiveSkillEffect)
+	local fontSizeBig = main.showFlavourText and 18 or 16
+	tooltip.center = true
+	tooltip.maxWidth = 800
 	-- Special case for sockets
-	if node.type == "Socket" and node.alloc then
+	if (node.type == "Socket" or node.containJewelSocket) and node.alloc then
 		local socket, jewel = build.itemsTab:GetSocketAndJewelForNodeID(node.id)
 		if jewel then
 			build.itemsTab:AddItemTooltip(tooltip, jewel, { nodeId = node.id })
@@ -1113,15 +1345,19 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 			self:AddNodeName(tooltip, node, build)
 		end
 		tooltip:AddSeparator(14)
-		if socket:IsEnabled() then
+		if socket ~= nil and socket:IsEnabled() then
 			tooltip:AddLine(14, colorCodes.TIP.."Tip: Right click this socket to go to the items page and choose the jewel for this socket.")
 		end
+
+		self:AddGlobalNodeWarningsToTooltip(tooltip, node, build)
+
 		tooltip:AddLine(14, colorCodes.TIP.."Tip: Hold Shift or Ctrl to hide this tooltip.")
 		return
 	end
 
 	-- Node name
 	self:AddNodeName(tooltip, node, build)
+	tooltip.center = false
 	if launch.devModeAlt then
 		if node.power and node.power.offence then
 			-- Power debugging info
@@ -1147,7 +1383,7 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 		tooltip:AddSeparator(14)
 	end
 
-	local function addModInfoToTooltip(node, i, line, localSmallIncEffect)
+	local function addModInfoToTooltip(node, i, line, localIncEffect)
 		if node.mods[i] then
 			if launch.devModeAlt and node.mods[i].list then
 				-- Modifier debugging info
@@ -1163,29 +1399,39 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 				end
 			end
 			
-			-- Apply Inc Node scaling from Hulking Form only visually
-			if (incSmallPassiveSkillEffect + localSmallIncEffect) > 0 and node.type == "Normal" and not node.isAttribute and not node.ascendancyName and node.mods[i].list then
-				local scale = 1 + (incSmallPassiveSkillEffect + localSmallIncEffect) / 100
+			-- Apply Inc Node scaling from Hulking Form + Radius Jewels only visually
+			if (((incSmallPassiveSkillEffect + localIncEffect) > 0 and node.type == "Normal") or (localIncEffect > 0 and node.type == "Notable")) and not node.isAttribute and not node.ascendancyName and node.mods[i].list then
+				local base = (localIncEffect or 0)
+				local scale = 1 + ((node.type == "Normal" and ((incSmallPassiveSkillEffect or 0) + base) or base) / 100)
+
 				local modsList = copyTable(node.mods[i].list)
 				local scaledList = new("ModList")
-				-- some passive node mods are only Condition/Flag and have no value to scale by default, grab number from line
-				if modsList[1] and modsList[1].type == "FLAG" then
-					modsList[1].value = tonumber(line:match("%d+"))
-				end
 				scaledList:ScaleAddList(modsList, scale)
 				for j, mod in ipairs(scaledList) do
-					local newValue = 0
+					local newValue
 					if type(mod.value) == "number" then
 						newValue = mod.value
 					elseif type(mod.value) == "table" then
-						newValue = mod.value.mod.value
+						if mod.value.mod then
+							newValue = mod.value.mod.value
+						else
+							newValue = mod.value.value
+						end
 					end
-					line = line:gsub("%d*%.?%d+", math.abs(newValue))
+					if type(newValue) == "number" then
+						line = line:gsub("%d*%.?%d+", math.abs(newValue), 1) -- Only scale first number in line
+					end
 				end
 				-- line = line .. "  ^8(Effect increased by "..incSmallPassiveSkillEffect.."%)"
 			end
 			
-			tooltip:AddLine(16, ((node.mods[i].extra or not node.mods[i].list) and colorCodes.UNSUPPORTED or colorCodes.MAGIC)..line)
+			if line ~= " " and (node.mods[i].extra or not node.mods[i].list) then 
+				local line = colorCodes.UNSUPPORTED..line
+				line = main.notSupportedModTooltips and (line .. main.notSupportedTooltipText) or line
+				tooltip:AddLine(fontSizeBig, line, "FONTIN SC")
+			else
+				tooltip:AddLine(fontSizeBig, colorCodes.MAGIC..line, "FONTIN SC")
+			end
 		end
 	end
 
@@ -1221,9 +1467,9 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 	-- loop over mods generated in CalcSetup by rad.func calls and grab the lines added
 	-- processStats once on copied node to cleanly setup for the tooltip
 	local function processTimeLostModsAndGetLocalEffect(mNode, build)
-		local localSmallIncEffect = 0
+		local localIncEffect = 0
 		local hasWSCondition = false
-		local newSd = copyTable(build.spec.tree.nodes[mNode.id].sd)
+		local newSd = copyTable(mNode.sd)
 		for _, mod in ipairs(mNode.finalModList) do
 			-- if the jewelMod has a WS Condition, only add the incEffect given it matches the activeWeaponSet
 			-- otherwise the mod came from a jewel that is allocMode 0, so it always applies
@@ -1231,7 +1477,9 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 				if modCriteria.type == "Condition" and modCriteria.var and modCriteria.var:match("^WeaponSet") then
 					if (tonumber(modCriteria.var:match("(%d)")) == (build.itemsTab.activeItemSet.useSecondWeaponSet and 2 or 1)) then
 						if mod.name == "JewelSmallPassiveSkillEffect" then
-							localSmallIncEffect = mod.value
+							localIncEffect = mod.value
+						elseif mod.name == "JewelNotablePassiveSkillEffect" then
+							localIncEffect = mod.value
 						elseif mod.parsedLine then
 							mergeStats(newSd, mod.parsedLine, build.spec)
 						end
@@ -1241,7 +1489,9 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 			end
 			if not hasWSCondition then
 				if mod.name == "JewelSmallPassiveSkillEffect" then
-					localSmallIncEffect = mod.value
+					localIncEffect = mod.value
+				elseif mod.name == "JewelNotablePassiveSkillEffect" then
+						localIncEffect = mod.value
 				elseif mod.parsedLine then
 					mergeStats(newSd, mod.parsedLine, build.spec)
 				end
@@ -1249,7 +1499,7 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 		end
 		mNode.sd = copyTable(newSd)
 		build.spec.tree:ProcessStats(mNode)
-		return localSmallIncEffect
+		return localIncEffect
 	end
 	
 	-- we only want to run the timeLost function on a node that can could be in a jewel socket radius of up to Large
@@ -1259,7 +1509,7 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 		local isInRadius = false
 		for id, socket in pairs(build.itemsTab.sockets) do
 			if build.itemsTab.activeSocketList and socket.inactive == false or socket.inactive == nil then
-				isInRadius = isInRadius or build.spec.nodes[id].nodesInRadius[3][node.id] ~= nil
+				isInRadius = isInRadius or (build.spec.nodes[id] and build.spec.nodes[id].nodesInRadius and build.spec.nodes[id].nodesInRadius[4][node.id] ~= nil)
 				if isInRadius then break end
 			end
 		end
@@ -1271,14 +1521,31 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 	local mNode = copyTableSafe(node, true, true)
 
 	-- This stanza actives for both Mastery and non Mastery tooltips. Proof: add '"Blah "..' to addModInfoToTooltip
-	if mNode.sd[1] and not mNode.allMasteryOptions then
+	if not mNode.sd then
+		ConPrintf("Node %d has no sd", node.id)
+	end
+	if mNode.sd and mNode.sd[1] and not mNode.allMasteryOptions then
 		tooltip:AddLine(16, "")
-		local localSmallIncEffect = 0
-		if not mNode.isAttribute and (mNode.type == "Normal" or mNode.type == "Notable") and isNodeInARadius(node) then
-			localSmallIncEffect = processTimeLostModsAndGetLocalEffect(mNode, build)
+		local localIncEffect = 0
+		if not (mNode.isAttribute and not mNode.conqueredBy) and (mNode.type == "Normal" or mNode.type == "Notable") and isNodeInARadius(node) then
+			localIncEffect = processTimeLostModsAndGetLocalEffect(mNode, build)
 		end
 		for i, line in ipairs(mNode.sd) do
-			addModInfoToTooltip(mNode, i, line, localSmallIncEffect)
+			addModInfoToTooltip(mNode, i, line, localIncEffect)
+		end
+	end
+
+	if node.containJewelSocket and node.alloc then
+		tooltip:AddSeparator(14)
+		-- Jewel socket with a jewel in it, show the jewel tooltip instead of the node tooltip
+		local socket, jewel = build.itemsTab:GetSocketAndJewelForNodeID(node.id)
+		if jewel then
+			build.itemsTab:AddItemTooltip(tooltip, jewel, { nodeId = node.id })
+			tooltip:AddSeparator(14)
+		end
+
+		if socket ~= nil and socket:IsEnabled() then
+			tooltip:AddLine(14, colorCodes.TIP.."Tip: Right click this socket to go to the items page and choose the jewel for this socket.")
 		end
 	end
 
@@ -1288,6 +1555,12 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 		for _, line in ipairs(node.reminderText) do
 			tooltip:AddLine(14, "^xA0A080"..line)
 		end
+	end
+	
+	-- Flavour text
+	if node.flavourText and main.showFlavourText then
+		tooltip:AddSeparator(14)
+		tooltip:AddLine(fontSizeBig, colorCodes.UNIQUE..node.flavourText, "FONTIN ITALIC")
 	end
 
 	-- Mod differences
@@ -1319,7 +1592,7 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 			end
 		end
 		local count = build:AddStatComparesToTooltip(tooltip, calcBase, nodeOutput, realloc and "^7Reallocating this node will give you:" or node.alloc and "^7Unallocating this node will give you:" or isGranted and "^7This node is granted by an item. Removing it will give you:" or "^7Allocating this node will give you:")
-		if pathLength > 1 and not isGranted then
+		if pathLength > 1 and not isGranted and (#node.intuitiveLeapLikesAffecting == 0 or node.alloc) then
 			count = count + build:AddStatComparesToTooltip(tooltip, calcBase, pathOutput, node.alloc and "^7Unallocating this node and all nodes depending on it will give you:" or "^7Allocating this node and all nodes leading to it will give you:", pathLength)
 		end
 		if count == 0 then
@@ -1350,15 +1623,124 @@ function PassiveTreeViewClass:AddNodeTooltip(tooltip, node, build, incSmallPassi
 			end
 		end
 	end
+	local goldCost = data.goldRespecPrices[build.characterLevel]
+	if node.ascendancyName then
+		goldCost = goldCost * 5
+	end
 	if node.depends and #node.depends > 1 then
-		tooltip:AddSeparator(14)
-		tooltip:AddLine(14, "^7"..#node.depends .. " points gained from unallocating these nodes")
+		-- remove node that have unlockConstraint from the count as they are not unallocated together with this node
+		local dependCount = #node.depends
+		for _, depNode in ipairs(node.depends) do
+			if depNode.unlockConstraint then
+				for _, reqNodeId in ipairs(depNode.unlockConstraint.nodes) do
+					local reqNode = build.spec.nodes[reqNodeId]
+					if reqNode == node and not depNode.alloc then
+						dependCount = dependCount - 1
+						break
+					end
+					if reqNode and not reqNode.alloc then
+						dependCount = dependCount - 1
+						break
+					end
+				end
+			end
+		end
+		if dependCount > 0 then
+			tooltip:AddSeparator(14)
+			tooltip:AddLine(14, "^7"..dependCount .. " points gained from unallocating these nodes")
+			tooltip:AddLine(14, "^xFFD700"..formatNumSep(dependCount * goldCost) .. " Gold ^7required to unallocate these nodes")
+			tooltip:AddLine(14, colorCodes.TIP)
+		end
+	elseif node.alloc then
+		tooltip:AddLine(14, "^xFFD700"..formatNumSep(#node.depends * goldCost) .. " Gold ^7required to unallocate this node")
 		tooltip:AddLine(14, colorCodes.TIP)
 	end
+
+	self:AddGlobalNodeWarningsToTooltip(tooltip, node, build)
+
+	if node.unlockConstraint then
+		local addedSeparator = false
+		for _, nodeId in ipairs(node.unlockConstraint.nodes) do
+			local reqNode = build.spec.nodes[nodeId]
+			if reqNode and not reqNode.alloc then
+				if not addedSeparator then
+					addedSeparator = true
+					tooltip:AddSeparator(14)
+				end
+				tooltip:AddLine(14, colorCodes.WARNING.."Requires allocation of node: "..reqNode.dn)
+			end
+		end
+
+		if addedSeparator then
+			tooltip:AddSeparator(14)
+		end
+	end
+
 	if node.type == "Socket" then
 		tooltip:AddLine(14, colorCodes.TIP.."Tip: Hold Shift or Ctrl to hide this tooltip.")
 	else
 		tooltip:AddLine(14, colorCodes.TIP.."Tip: Hold Ctrl to hide this tooltip.")
+		tooltip:AddLine(14, colorCodes.TIP.."Tip: Press Ctrl+C to copy this node's text.")
+	end
+end
+
+-- Helper function to check if a node is connected to weapon set nodes
+function PassiveTreeViewClass:IsConnectedToWeaponSetNodes(node)
+	-- First check the path for weapon set nodes
+	if node.path and #node.path > 1 then
+		-- Check all nodes in the path (except the first element since it's the target node itself)
+		for i = 2, #node.path do
+			local pathNode = node.path[i]
+			if pathNode.alloc and pathNode.allocMode > 0 then
+				return true
+			end
+		end
+	end
+
+	-- And finally check for direct connections when path is short or empty
+	-- (This handles cases where global nodes are directly adjacent to weapon set nodes)
+	if node.linked then
+		for _, linkedNode in ipairs(node.linked) do
+			if linkedNode.alloc and linkedNode.allocMode and linkedNode.allocMode > 0 then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+-- Helper function to add warnings in the tooltip for global nodes (keystones/jewel sockets)
+function PassiveTreeViewClass:AddGlobalNodeWarningsToTooltip(tooltip, node, build)
+	local isGlobalNode = node.type == "Keystone" or node.type == "Socket" or node.containJewelSocket
+
+	if not isGlobalNode then
+		return -- No warning needed for non-global nodes
+	end
+
+	local nodeTypeText = node.type == "Keystone" and "keystones" or "jewel sockets"
+	local warningText = ""
+	local tipText = ""
+
+	if not node.alloc and node.path then
+		-- Unallocated global node - check allocation conditions
+		if build.spec.allocMode > 0 then
+			warningText = "Cannot allocate " .. nodeTypeText .. " while weapon set " .. build.spec.allocMode .. " is selected"
+			tipText = "Tip: Switch to main tree (Alt+scroll) to allocate " .. nodeTypeText
+		elseif self:IsConnectedToWeaponSetNodes(node) then
+			warningText = "Cannot allocate " .. nodeTypeText .. " - connected to weapon set nodes"
+			tipText = "Tip: Deallocate weapon set nodes in the connection path to allow allocation"
+		end
+	elseif node.alloc and node.allocMode == 0 and build.spec.allocMode > 0 then
+		-- Allocated main-tree global node viewed from weapon set
+		warningText = "Cannot deallocate global " .. nodeTypeText .. " from weapon set " .. build.spec.allocMode
+		tipText = "Tip: Switch to main tree (Alt+scroll) to deallocate " .. nodeTypeText
+	end
+
+	if warningText ~= "" then
+		tooltip:AddSeparator(14)
+		tooltip:AddLine(14, colorCodes.WARNING .. warningText)
+		tooltip:AddLine(14, colorCodes.TIP .. tipText)
 	end
 end
 

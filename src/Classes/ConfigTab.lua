@@ -495,6 +495,17 @@ local ConfigTabClass = newClass("ConfigTab", "UndoHandler", "ControlHost", "Cont
 					end))
 				end
 			end
+			if varData.ifSkillType then
+				t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkillType, function(ifOption)
+					for _, activeSkill in ipairs(self.build.calcsTab.mainEnv.player.activeSkillList) do
+						-- only checking flags of skill in main env. rework may be required
+						if activeSkill.skillTypes[ifOption] then
+							return true
+						end
+					end
+					return false
+				end))
+			end
 			if varData.ifSkillFlag then
 				t_insert(shownFuncs, listOrSingleIfOption(varData.ifSkillFlag, function(ifOption)
 					for _, activeSkill in ipairs(self.build.calcsTab.mainEnv.player.activeSkillList) do
@@ -867,9 +878,9 @@ function ConfigTabClass:BuildModList()
 					varData.apply(true, modList, enemyModList, self.build)
 				end
 			elseif varData.type == "count" or varData.type == "integer" or varData.type == "countAllowZero" or varData.type == "float" then
-				if input[varData.var] and (input[varData.var] ~= 0 or varData.type == "countAllowZero") then
+				if input[varData.var] and (input[varData.var] ~= 0 or varData.type ~= "count") then
 					varData.apply(input[varData.var], modList, enemyModList, self.build)
-				elseif placeholder[varData.var] and (placeholder[varData.var] ~= 0 or varData.type == "countAllowZero") then
+				elseif placeholder[varData.var] and (placeholder[varData.var] ~= 0 or varData.type ~= "count") then
 					varData.apply(placeholder[varData.var], modList, enemyModList, self.build)
 				end
 			elseif varData.type == "list" then

@@ -4,19 +4,6 @@
 return {
 	[1]={
 		[1]={
-			[1]={
-				[1]={
-					k="divide_by_ten_1dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Impact radius {0}m"
-			}
 		},
 		stats={
 			[1]="active_skill_area_of_effect_radius"
@@ -90,19 +77,6 @@ return {
 	},
 	[4]={
 		[1]={
-			[1]={
-				[1]={
-					k="divide_by_ten_1dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Jagged Ground radius {0}m"
-			}
 		},
 		stats={
 			[1]="active_skill_tertiary_area_of_effect_radius"
@@ -113,24 +87,46 @@ return {
 			[1]={
 				limit={
 					[1]={
-						[1]=1,
-						[2]=1
+						[1]="#",
+						[2]="#"
+					},
+					[2]={
+						[1]=0,
+						[2]=0
 					}
 				},
-				text="Maximum {0} Jagged Ground patch"
+				text="{0:+d} to Jagged Ground patch Limit"
 			},
 			[2]={
 				limit={
 					[1]={
-						[1]=2,
+						[1]=1,
+						[2]=1
+					},
+					[2]={
+						[1]="#",
 						[2]="#"
 					}
 				},
-				text="Maximum {0} Jagged Ground patches"
+				text="Limit {0} Jagged Ground patch"
+			},
+			[3]={
+				limit={
+					[1]={
+						[1]=2,
+						[2]="#"
+					},
+					[2]={
+						[1]="#",
+						[2]="#"
+					}
+				},
+				text="Limit {0} Jagged Ground patches"
 			}
 		},
 		stats={
-			[1]="base_number_of_earthquakes_allowed"
+			[1]="base_number_of_earthquakes_allowed",
+			[2]="quality_display_earthquake_is_gem"
 		}
 	},
 	[6]={
@@ -142,7 +138,7 @@ return {
 						[2]="#"
 					}
 				},
-				text="Maximum Jagged Ground patches@{0}"
+				text="Jagged Ground patch Limit@{0}"
 			}
 		},
 		stats={
@@ -151,19 +147,6 @@ return {
 	},
 	[7]={
 		[1]={
-			[1]={
-				[1]={
-					k="milliseconds_to_seconds_2dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Jagged Ground duration {0}s"
-			}
 		},
 		stats={
 			[1]="skill_effect_duration"
@@ -209,6 +192,7 @@ return {
 	["base_number_of_earthquakes_allowed"]=5,
 	["number_of_earthquakes_allowed"]=6,
 	parent="skill_stat_descriptions",
+	["quality_display_earthquake_is_gem"]=5,
 	["skill_effect_duration"]=7,
 	["skill_jagged_ground_base_duration_ms"]=8
 }

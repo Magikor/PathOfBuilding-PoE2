@@ -53,7 +53,7 @@ function itemLib.formatValue(value, baseValueScalar, valueScalar, precision, dis
 	elseif displayPrecision then
 		return tostring(value, displayPrecision)
 	else
-		return tostring(roundSymmetric(value,  precision and m_min(2, m_floor(math.log(precision, 10))) or 2)) -- max decimals ingame is 2 
+		return tostring(roundSymmetric(value,  precision and m_min(2, m_floor(math.log(precision, 10) + 0.001)) or 2)) -- max decimals ingame is 2 
 	end
 end
 
@@ -326,11 +326,12 @@ function itemLib.formatModLine(modLine, dbMode)
 	local colorCode
 	if modLine.extra then
 		colorCode = colorCodes.UNSUPPORTED
+		line = main.notSupportedModTooltips and (line .. main.notSupportedTooltipText) or line
 		if launch.devModeAlt then
 			line = line .. "   ^1'" .. modLine.extra .. "'"
 		end
 	else
-		colorCode = (modLine.enchant and colorCodes.ENCHANTED) or (modLine.custom and colorCodes.CUSTOM) or colorCodes.MAGIC
+		colorCode = (modLine.enchant and colorCodes.ENCHANTED) or (modLine.fractured and colorCodes.FRACTURED) or (modLine.mutated and colorCodes.MUTATED) or (modLine.custom and colorCodes.CUSTOM) or colorCodes.MAGIC
 	end
 	return colorCode..line
 end
@@ -351,7 +352,7 @@ itemLib.wiki = {
 		itemLib.wiki.open(name)
 	end,
 	openItem = function(item)
-		local name = item.rarity == "UNIQUE" and item.title or item.baseName
+		local name = (item.rarity == "UNIQUE" or item.rarity == "RELIC") and item.title or item.baseName
 
 		itemLib.wiki.open(name)
 	end,

@@ -9,6 +9,7 @@ local allyDamage = ""
 local damage = ""
 local armour = ""
 local ailmentThreshold = ""
+local poiseThreshold = ""
 local minionLevel = ""
 for stats in dat("DefaultMonsterStats"):Rows() do
 	evasion = evasion .. stats.Evasion .. ", "
@@ -19,6 +20,7 @@ for stats in dat("DefaultMonsterStats"):Rows() do
 	allyDamage = allyDamage .. stats.MinionDamage .. ", "
 	armour = armour .. stats.Armour .. ", "
 	ailmentThreshold = ailmentThreshold .. stats.AilmentThreshold .. ", "
+	poiseThreshold = poiseThreshold .. stats.PoiseThreshold .. ", "
 end
 -- Table was incorrect is PoE 1 but seems to be correct for PoE 2. Keeping here just in case
 --for i = 1, 100 do
@@ -33,6 +35,7 @@ out:write('data.monsterDamageTable = { '..damage..'}\n')
 out:write('data.monsterAllyDamageTable = { '..allyDamage..'}\n')
 out:write('data.monsterArmourTable = { '..armour..'}\n')
 out:write('data.monsterAilmentThresholdTable = { '..ailmentThreshold..'}\n')
+out:write('data.monsterPoiseThresholdTable = { '..poiseThreshold..'}\n')
 out:write('\n')
 
 out:write('-- From MinionGemLevelScaling.dat\n')
@@ -49,16 +52,73 @@ for row in dat("GameConstants"):Rows() do
 end
 out:write('}\n')
 
+out:write('-- From Metadata/Characters/Character.ot\n')
+out:write('data.characterConstants = {\n')
+local file = getFile("Metadata/Characters/Character.ot")
+if not file then return nil end
+local text = convertUTF16to8(file)
+local inWantedBlock = false
+for line in text:gmatch("[^\r\n]+") do
+	-- Detect start of a block
+	if line:match("^Stats") or line:match("^Pathfinding") then
+		inWantedBlock = true
+	elseif inWantedBlock and line:match("^}") then
+		inWantedBlock = false
+	elseif inWantedBlock and line:find("=") then
+		local key, value = line:gsub("%s+",""):match("^(.-)=(.+)$")
+		if key and value then
+			out:write('\t["' .. key .. '"] = ' .. value .. ',\n')
+		end
+	end
+end
+out:write('}\n')
+
+out:write('-- From Metadata/Monsters/Monster.ot\n')
+out:write('data.monsterConstants = {\n')
+local file = getFile("Metadata/Monsters/Monster.ot")
+if not file then return nil end
+local text = convertUTF16to8(file)
+local inWantedBlock = false
+for line in text:gmatch("[^\r\n]+") do
+	-- Detect start of a block
+	if line:match("^Stats") then
+		inWantedBlock = true
+	elseif inWantedBlock and line:match("^}") then
+		inWantedBlock = false
+	elseif inWantedBlock and line:find("=") then
+		local key, value = line:gsub("%s+",""):match("^(.-)=(.+)$")
+		if key and value then
+			out:write('\t["' .. key .. '"] = ' .. value .. ',\n')
+		end
+	end
+end
+out:write('}\n')
+
+out:write('-- From PlayerMinionIntrinsicStats.dat\n')
+out:write('data.playerMinionIntrinsicStats = {\n')
+for row in dat("PlayerMinionIntrinsicStats"):Rows() do
+	out:write('\t["' .. row.Id.Id .. '"] = ' .. row.Value .. ',\n')
+end
+out:write('}\n')
+
 local totemMult = ""
 local keys = { }
 for var in dat("SkillTotemVariations"):Rows() do
 	if not keys[var.SkillTotem] then
 		keys[var.SkillTotem] = true
-		totemMult = totemMult .. "[" .. var.SkillTotem .. "] = " .. var.MonsterVariety.LifeMultiplier / 100 .. ", "
+		totemMult = totemMult .. "[" .. var.SkillTotem .. "] = " .. ((var.MonsterVariety and var.MonsterVariety.LifeMultiplier / 100) or 1) .. ", "
 	end
 end
 out:write('-- From MonsterVarieties.dat combined with SkillTotemVariations.dat\n')
 out:write('data.totemLifeMult = { '..totemMult..'}\n')
+
+--[[out:write('-- From ActiveSkillType.dat\n') --Export list for use in Global.lua
+out:write('data.skillTypeMap = {\n')
+local skillTypeMap = { }
+for row in dat("ActiveSkillType"):Rows() do
+	out:write('\t' .. row.Id .. ' = ' .. row._rowIndex .. ',\n')
+end
+out:write('}\n')]]
 
 out:write('data.monsterVarietyLifeMult = {\n')
 local cachedEntry = { }
@@ -90,6 +150,21 @@ end
 out:write('-- From MonsterMapBossDifficulty.dat\n')
 out:write('data.mapLevelBossLifeMult = { '..mapBossLifeMult..'}\n')
 out:write('data.mapLevelBossAilmentMult = { '..mapBossAilmentMult..'}\n')
+out:write('\n')
+
+out:write('-- From FlatPhysicalDamageValues.dat\n')
+out:write('data.hollowPalmAddedPhys = {\n')
+for row in dat("FlatPhysicalDamageValues"):Rows() do
+	out:write('\t[' .. row.Level .. '] = { ' .. row.MinPhys .. ', ' .. row.MaxPhys .. ' },\n')
+end
+out:write('}\n')
+
+out:write('-- From GoldRespecPrices.dat\n')
+out:write('data.goldRespecPrices = { ')
+for row in dat("GoldRespecPrices"):Rows() do
+	out:write(row.Cost .. ', ')
+end
+out:write('}\n')
 
 out:close()
 

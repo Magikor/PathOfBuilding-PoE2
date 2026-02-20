@@ -104,10 +104,23 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 			control = new("DropDownControl", nil, {0, 0, 160, 16}, nil, function(index, value)
 				local mainSocketGroup = self.build.skillsTab.socketGroupList[self.input.skill_number]
 				local srcInstance = mainSocketGroup.displaySkillListCalcs[mainSocketGroup.mainActiveSkillCalcs].activeEffect.srcInstance
+				-- Synchronize DropDownControl between CalcActiveSkill and skillMinionCalcs
 				if value.itemSetId then
 					srcInstance.skillMinionItemSetCalcs = value.itemSetId
+					srcInstance.skillMinionItemSet = value.itemSetId
+					if srcInstance.nameSpec:match("^Spectre:") then
+						srcInstance.nameSpec = "Spectre: ".. value.label
+					elseif srcInstance.nameSpec:match("^Companion:") then
+						srcInstance.nameSpec = "Companion: ".. value.label
+					end
 				else
 					srcInstance.skillMinionCalcs = value.minionId
+					srcInstance.skillMinion = value.minionId
+					if srcInstance.nameSpec:match("^Spectre:") then
+						srcInstance.nameSpec = "Spectre: ".. value.label
+					elseif srcInstance.nameSpec:match("^Companion:") then
+						srcInstance.nameSpec = "Companion: ".. value.label
+					end
 				end
 				self:AddUndoState()
 				self.build.buildFlag = true
@@ -115,7 +128,12 @@ local CalcsTabClass = newClass("CalcsTab", "UndoHandler", "ControlHost", "Contro
 		} },
 		{ label = "Spectre Library", flag = "spectre", { controlName = "mainSkillMinionLibrary",
 			control = new("ButtonControl", nil, {0, 0, 100, 16}, "Manage Spectres...", function()
-				self.build:OpenSpectreLibrary()
+				self.build:OpenSpectreLibrary("spectre")
+			end)
+		} },
+		{ label = "Beast Library", flag = "summonBeast", { controlName = "mainSkillBeastLibrary",
+			control = new("ButtonControl", nil, {0, 0, 100, 16}, "Manage Beasts...", function()
+			self.build:OpenSpectreLibrary("beast")
 			end)
 		} },
 		{ label = "Minion Skill", flag = "haveMinion", { controlName = "mainSkillMinionSkill",
@@ -396,7 +414,11 @@ end
 function CalcsTabClass:CheckFlag(obj)
 	local actor = self.input.showMinion and self.calcsEnv.minion or self.calcsEnv.player
 	local skillFlags = actor.mainSkill.activeEffect.statSetCalcs.skillFlags
+	local skillData = actor.mainSkill.skillData
 	if obj.flag and not skillFlags[obj.flag] then
+		return
+	end
+	if obj.skillData and not skillData[obj.skillData] then
 		return
 	end
 	if obj.flagList then
@@ -410,6 +432,9 @@ function CalcsTabClass:CheckFlag(obj)
 		return
 	end
 	if obj.notFlag and skillFlags[obj.notFlag] then
+		return
+	end
+	if obj.notSkillData and skillData[obj.notSkillData] then
 		return
 	end
 	if obj.notFlagList then
@@ -494,7 +519,7 @@ end
 
 -- Estimate the offensive and defensive power of all unallocated nodes
 function CalcsTabClass:PowerBuilder()
-	--local timer_start = GetTime()
+	-- local timer_start = GetTime()
 	local useFullDPS = self.powerStat and self.powerStat.stat == "FullDPS"
 	local calcFunc, calcBase = self:GetMiscCalculator()
 	local cache = { }
@@ -515,11 +540,17 @@ function CalcsTabClass:PowerBuilder()
 	end
 	
 	local start = GetTime()
+	local nodeIndex = 0
+	local total = 0
+
 	for nodeId, node in pairs(self.build.spec.nodes) do
 		wipeTable(node.power)
 		if node.modKey ~= "" and not self.mainEnv.grantedPassives[nodeId] then
 			distanceMap[node.pathDist or 1000] = distanceMap[node.pathDist or 1000] or { }
 			distanceMap[node.pathDist or 1000][nodeId] = node
+			if not (self.nodePowerMaxDepth and self.nodePowerMaxDepth < node.pathDist) then
+				total = total + 1
+			end
 		end
 	end
 	for distance, nodes in pairs(distanceMap) do
@@ -527,6 +558,13 @@ function CalcsTabClass:PowerBuilder()
 	end
 	distanceMap = nil
 	table.sort(distanceList, function(a, b) return a[1] < b[1] end)
+	-- Count eligible cluster nodes
+	for _, node in pairs(self.build.spec.tree.clusterNodeMap) do
+		if not node.alloc and node.modKey ~= "" and not self.mainEnv.grantedPassives[node.id] then
+			total = total + 1
+		end
+	end
+
 	for _, data in ipairs(distanceList) do
 		local distance, nodes = data[1], data[2]
 		if self.nodePowerMaxDepth and self.nodePowerMaxDepth < distance then
@@ -580,7 +618,11 @@ function CalcsTabClass:PowerBuilder()
 					end
 				end
 			end
+			nodeIndex = nodeIndex + 1
 			if coroutine.running() and GetTime() - start > 100 then
+				if self.build.powerBuilderProgressCallback then
+					self.build.powerBuilderProgressCallback(m_floor(nodeIndex/total*100))
+				end
 				coroutine.yield()
 				start = GetTime()
 			end
@@ -602,15 +644,19 @@ function CalcsTabClass:PowerBuilder()
 			if self.powerStat and self.powerStat.stat and not self.powerStat.ignoreForNodes then
 				node.power.singleStat = self:CalculatePowerStat(self.powerStat, output, calcBase)
 			end
-		end
-		if coroutine.running() and GetTime() - start > 100 then
-			coroutine.yield()
-			start = GetTime()
+			nodeIndex = nodeIndex + 1
+			if coroutine.running() and GetTime() - start > 100 then
+				if self.build.powerBuilderProgressCallback then
+					self.build.powerBuilderProgressCallback(m_floor(nodeIndex/total*100))
+				end
+				coroutine.yield()
+				start = GetTime()
+			end
 		end
 	end
 	self.powerMax = newPowerMax
 	self.powerBuilderInitialized = true
-	--ConPrintf("Power Build time: %d ms", GetTime() - timer_start)
+	-- ConPrintf("Power Build time: %d ms", GetTime() - timer_start)
 end
 
 function CalcsTabClass:CalculatePowerStat(selection, original, modified)

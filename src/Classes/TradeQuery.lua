@@ -16,7 +16,7 @@ local m_min = math.min
 local m_ceil = math.ceil
 local s_format = string.format
 
-local baseSlots = { "Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt", "Charm 1", "Charm 2", "Charm 3", "Flask 1", "Flask 2" }
+local baseSlots = { "Weapon 1", "Weapon 2", "Weapon 1 Swap", "Weapon 2 Swap", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Ring 3", "Belt", "Charm 1", "Charm 2", "Charm 3", "Flask 1", "Flask 2" }
 
 local TradeQueryClass = newClass("TradeQuery", function(self, itemsTab)
 	self.itemsTab = itemsTab
@@ -65,7 +65,7 @@ function TradeQueryClass:FetchCurrencyConversionTable(callback)
 		"https://www.pathofexile.com/api/trade2/data/static",
 		function(response, errMsg)
 			if errMsg then
-				callback(response, errMsg)
+				-- SKIP CALLBACK ON ERROR TO PREVENT PARTIAL DATA
 				return
 			end
 			local obj = dkjson.decode(response.body)
@@ -78,7 +78,7 @@ function TradeQueryClass:FetchCurrencyConversionTable(callback)
 				end
 			end
 			for _, value in pairs(currencyTable) do
-				currencyConversionTradeMap[value.text] = value.id
+				currencyConversionTradeMap[value.text:lower()] = value.id
 			end
 			self.currencyConversionTradeMap = currencyConversionTradeMap
 			if callback then
@@ -105,7 +105,7 @@ function TradeQueryClass:PullLeagueList()
 				table.sort(json_data, function(a, b)
 					if a.endAt == nil then return false end
 					if b.endAt == nil then return true end
-					return #a.id < #b.id
+					return a.id < b.id
 				end)
 				self.itemsTab.leagueDropList = {}
 				for _, league_data in pairs(json_data) do
@@ -378,7 +378,7 @@ Highest Weight - Displays the order retrieved from trade]]
 		else
 			self.tradeQueryRequests:FetchLeagues(self.pbRealm, function(leagues, errMsg)
 				if errMsg then
-					self:SetNotice("Error while fetching league list: "..errMsg)
+					self:SetNotice(self.controls.pbNotice, "Error while fetching league list: "..errMsg)
 					return
 				end
 				local sorted_leagues = { }
@@ -418,7 +418,9 @@ Highest Weight - Displays the order retrieved from trade]]
 	-- Individual slot rows
 	local slotTables = {}
 	for _, slotName in ipairs(baseSlots) do
-		t_insert(slotTables, { slotName = slotName })
+		if self.itemsTab.slots[slotName].shown() then
+			t_insert(slotTables, { slotName = slotName })
+		end
 	end
 	local activeSocketList = { }
 	for nodeId, slot in pairs(self.itemsTab.sockets) do
@@ -471,7 +473,7 @@ Highest Weight - Displays the order retrieved from trade]]
 
 	local effective_row_count = row_count - ((scrollBarShown and #slotTables >= 19) and #slotTables-19 or 0) + 2 + 2 -- Two top menu rows, two bottom rows, slots after #19 overlap the other controls at the bottom of the pane
 	self.effective_rows_height = row_height * (effective_row_count - #slotTables + (18 - (#slotTables > 37 and 3 or 0))) -- scrollBar height, "18 - slotTables > 37" logic is fine tuning whitespace after last row
-	self.pane_height = (row_height + row_vertical_padding) * effective_row_count + 2 * pane_margins_vertical + row_height / 2
+	self.pane_height = (row_height + row_vertical_padding) * effective_row_count + 3 * pane_margins_vertical + row_height / 2
 	local pane_width = 850 + (scrollBarShown and 25 or 0)
 
 	self.controls.scrollBar = new("ScrollBarControl", {"TOPRIGHT", self.controls["StatWeightMultipliersButton"],"TOPRIGHT"}, {0, 25, 18, 0}, 50, "VERTICAL", false)
@@ -657,7 +659,7 @@ end
 function TradeQueryClass:SetNotice(notice_control, msg)
 	if msg:find("No Matching Results") then
 		msg = colorCodes.WARNING .. msg
-	elseif msg:find("Error:") then
+	elseif msg:find("Error") then
 		msg = colorCodes.NEGATIVE .. msg
 	end
 	notice_control.label = msg
@@ -673,46 +675,37 @@ function TradeQueryClass:ReduceOutput(output)
 end
 
 -- Method to evaluate a result by getting it's output and weight
-function TradeQueryClass:GetResultEvaluation(row_idx, result_index, calcFunc, baseOutput)
+function TradeQueryClass:GetResultEvaluation(row_idx, result_index)
 	local result = self.resultTbl[row_idx][result_index]
-	if not calcFunc then -- Always evaluate when calcFunc is given
-		calcFunc, baseOutput = self.itemsTab.build.calcsTab:GetMiscCalculator()
-		local onlyWeightedBaseOutput = self:ReduceOutput(baseOutput)
-		if not self.onlyWeightedBaseOutput[row_idx] then
-			self.onlyWeightedBaseOutput[row_idx] = { }
-		end
-		if not self.lastComparedWeightList[row_idx] then
-			self.lastComparedWeightList[row_idx] = { }
-		end
-		-- If the interesting stats are the same (the build hasn't changed) and result has already been evaluated, then just return that
-		if result.evaluation and tableDeepEquals(onlyWeightedBaseOutput, self.onlyWeightedBaseOutput[row_idx][result_index]) and tableDeepEquals(self.statSortSelectionList, self.lastComparedWeightList[row_idx][result_index]) then
-			return result.evaluation
-		end
-		self.onlyWeightedBaseOutput[row_idx][result_index] = onlyWeightedBaseOutput
-		self.lastComparedWeightList[row_idx][result_index] = self.statSortSelectionList
+	local calcFunc, baseOutput = self.itemsTab.build.calcsTab:GetMiscCalculator()
+	local onlyWeightedBaseOutput = self:ReduceOutput(baseOutput)
+	if not self.onlyWeightedBaseOutput[row_idx] then
+		self.onlyWeightedBaseOutput[row_idx] = { }
 	end
+	if not self.lastComparedWeightList[row_idx] then
+		self.lastComparedWeightList[row_idx] = { }
+	end
+	-- If the interesting stats are the same (the build hasn't changed) and result has already been evaluated, then just return that
+	if result.evaluation and tableDeepEquals(onlyWeightedBaseOutput, self.onlyWeightedBaseOutput[row_idx][result_index]) and tableDeepEquals(self.statSortSelectionList, self.lastComparedWeightList[row_idx][result_index]) then
+		return result.evaluation
+	end
+	self.fullBaseOutput = baseOutput
+	self.onlyWeightedBaseOutput[row_idx][result_index] = onlyWeightedBaseOutput
+	self.lastComparedWeightList[row_idx][result_index] = self.statSortSelectionList
+	
 	local slotName = self.slotTables[row_idx].nodeId and "Jewel " .. tostring(self.slotTables[row_idx].nodeId) or self.slotTables[row_idx].slotName
 	if slotName == "Megalomaniac" then
 		local addedNodes = {}
-		for nodeName in (result.item_string.."\r\n"):gmatch("1 Added Passive Skill is (.-)\r?\n") do
-			t_insert(addedNodes, self.itemsTab.build.spec.tree.clusterNodeMap[nodeName])
+		for nodeName in (result.item_string.."\r\n"):gmatch("Allocates (.-)\r?\n") do
+			local node = self.itemsTab.build.spec.tree.notableMap[nodeName:lower()]
+			if node and node.recipes ~= nil then
+				addedNodes[node] = true
+			end
 		end
-		local output12  = self:ReduceOutput(calcFunc({ addNodes = { [addedNodes[1]] = true, [addedNodes[2]] = true } }))
-		local output13  = self:ReduceOutput(calcFunc({ addNodes = { [addedNodes[1]] = true, [addedNodes[3]] = true } }))
-		local output23  = self:ReduceOutput(calcFunc({ addNodes = { [addedNodes[2]] = true, [addedNodes[3]] = true } }))
-		local output123 = self:ReduceOutput(calcFunc({ addNodes = { [addedNodes[1]] = true, [addedNodes[2]] = true, [addedNodes[3]] = true } }))
-		-- Sometimes the third node is as powerful as a wet noodle, so use weight per point spent, including the jewel socket
-		local weight12  = self.tradeQueryGenerator.WeightedRatioOutputs(baseOutput, output12,  self.statSortSelectionList) / 4
-		local weight13  = self.tradeQueryGenerator.WeightedRatioOutputs(baseOutput, output13,  self.statSortSelectionList) / 4
-		local weight23  = self.tradeQueryGenerator.WeightedRatioOutputs(baseOutput, output23,  self.statSortSelectionList) / 4
-		local weight123 = self.tradeQueryGenerator.WeightedRatioOutputs(baseOutput, output123, self.statSortSelectionList) / 5
-		result.evaluation = {
-			{ output = output12,  weight = weight12,  DNs = { addedNodes[1].dn, addedNodes[2].dn } },
-			{ output = output13,  weight = weight13,  DNs = { addedNodes[1].dn, addedNodes[3].dn } },
-			{ output = output23,  weight = weight23,  DNs = { addedNodes[2].dn, addedNodes[3].dn } },
-			{ output = output123, weight = weight123, DNs = { addedNodes[1].dn, addedNodes[2].dn, addedNodes[3].dn } },
-		}
-		table.sort(result.evaluation, function(a, b) return a.weight > b.weight end)
+		
+		local output = self:ReduceOutput(calcFunc({ addNodes = addedNodes }))
+		local weight = self.tradeQueryGenerator.WeightedRatioOutputs(baseOutput, output, self.statSortSelectionList)
+		result.evaluation = {{ output = output, weight = weight }}
 	else
 		local item = new("Item", result.item_string)
 		if not self.enchantInSort then -- Calc item DPS without anoint or enchant as these can generally be added after.
@@ -773,11 +766,7 @@ end
 
 -- Method to sort the fetched results
 function TradeQueryClass:SortFetchResults(row_idx, mode)
-	local calcFunc, baseOutput
 	local function getResultWeight(result_index)
-		if not calcFunc then
-			calcFunc, baseOutput = self.itemsTab.build.calcsTab:GetMiscCalculator()
-		end
 		local sum = 0
 		for _, eval in ipairs(self:GetResultEvaluation(row_idx, result_index)) do
 			sum = sum + eval.weight
@@ -892,6 +881,7 @@ function TradeQueryClass:PriceItemRowDisplay(row_idx, top_pane_alignment_ref, ro
 		end)
 	end)
 	controls["bestButton"..row_idx].shown = function() return not self.resultTbl[row_idx] end
+	controls["bestButton"..row_idx].enabled = function() return self.pbLeague end
 	controls["bestButton"..row_idx].tooltipText = "Creates a weighted search to find the highest Stat Value items for this slot."
 	local pbURL
 	controls["uri"..row_idx] = new("EditControl", { "TOPLEFT", controls["bestButton"..row_idx], "TOPRIGHT"}, {8, 0, 514, row_height}, nil, nil, "^%C\t\n", nil, function(buf)
@@ -969,27 +959,20 @@ function TradeQueryClass:PriceItemRowDisplay(row_idx, top_pane_alignment_ref, ro
 		self.itemIndexTbl[row_idx] = self.sortedResultTbl[row_idx][index].index
 		self:SetFetchResultReturn(row_idx, self.itemIndexTbl[row_idx])
 	end)
-	local function addMegalomaniacCompareToTooltipIfApplicable(tooltip, result_index)
-		if slotTbl.slotName ~= "Megalomaniac" then
-			return
-		end
-		for _, evaluationEntry in ipairs(self:GetResultEvaluation(row_idx, result_index)) do
-			tooltip:AddSeparator(10)
-			local nodeDNs = evaluationEntry.DNs
-			local nodeCombo = nodeDNs[1]
-			for i = 2, #nodeDNs do
-				nodeCombo = nodeCombo .. " ^8+^7 " .. nodeDNs[i]
-			end
-			self.itemsTab.build:AddStatComparesToTooltip(tooltip, self.onlyWeightedBaseOutput[row_idx][result_index], evaluationEntry.output, "^8Allocating ^7"..nodeCombo.."^8 will give You:", #nodeDNs + 2)
+	local function addCompareTooltip(tooltip, result_index, dbMode)
+		local result = self.resultTbl[row_idx][result_index]
+		local item = new("Item", result.item_string)
+		self.itemsTab:AddItemTooltip(tooltip, item, slotTbl, dbMode)
+		if main.slotOnlyTooltips and slotTbl.slotName == "Megalomaniac" then
+			local evaluation = self.resultTbl[row_idx][result_index].evaluation
+			self.itemsTab.build:AddStatComparesToTooltip(tooltip, self.onlyWeightedBaseOutput[row_idx][result_index], evaluation[1].output, "^7Equipping this item will give you:")
 		end
 	end
 	controls["resultDropdown"..row_idx].tooltipFunc = function(tooltip, dropdown_mode, dropdown_index, dropdown_display_string)
-		local pb_index = self.sortedResultTbl[row_idx][dropdown_index].index
-		local result = self.resultTbl[row_idx][pb_index]
-		local item = new("Item", result.item_string)
 		tooltip:Clear()
-		self.itemsTab:AddItemTooltip(tooltip, item, slotTbl)
-		addMegalomaniacCompareToTooltipIfApplicable(tooltip, pb_index)
+		local result_index = self.sortedResultTbl[row_idx][dropdown_index].index
+		local result = self.resultTbl[row_idx][result_index]
+		addCompareTooltip(tooltip, result_index)
 		tooltip:AddSeparator(10)
 		tooltip:AddLine(16, string.format("^7Price: %s %s", result.amount, result.currency))
 	end
@@ -1010,14 +993,8 @@ function TradeQueryClass:PriceItemRowDisplay(row_idx, top_pane_alignment_ref, ro
 	controls["importButton"..row_idx].tooltipFunc = function(tooltip)
 		tooltip:Clear()
 		local selected_result_index = self.itemIndexTbl[row_idx]
-		local item_string = self.resultTbl[row_idx][selected_result_index].item_string
-		if selected_result_index and item_string then
-			-- TODO: item parsing bug caught here.
-			-- item.baseName is nil and throws error in the following AddItemTooltip func
-			-- if the item is unidentified
-			local item = new("Item", item_string)
-			self.itemsTab:AddItemTooltip(tooltip, item, slotTbl, true)
-			addMegalomaniacCompareToTooltipIfApplicable(tooltip, selected_result_index)
+		if selected_result_index then
+			addCompareTooltip(tooltip, selected_result_index, true)
 		end
 	end
 	controls["importButton"..row_idx].enabled = function()

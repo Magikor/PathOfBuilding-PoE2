@@ -5,34 +5,34 @@ local json = require("dkjson")
 -- by session we would like to don't extract the same file multiple times
 main.treeCacheExtract = main.treeCacheExtract or { }
 local cacheExtract = main.treeCacheExtract
+local ignoreFilter = "^%[DNT"
 
 if not loadStatFile then
 	dofile("statdesc.lua")
 end
 loadStatFile("passive_skill_stat_descriptions.csd")
 
-local function extractFromGgpk(listToExtract, useRegex)
-	useRegex = useRegex or false
-	local sweetSpotCharacter = 6000
-	printf("Extracting ...")
-	local fileList = ''
-	for _, fname in ipairs(listToExtract) do
-		-- we are going to validate if the file is already extracted in this session
-		if not cacheExtract[fname] then
-			cacheExtract[fname] = true
-			fileList = fileList .. '"' .. string.lower(fname) .. '" '
+local function CalcOrbitAngles(nodesInOrbit)
+	local orbitAngles = {}
 
-			if fileList:len() > sweetSpotCharacter then
-				main.ggpk:ExtractFilesWithBun(fileList, useRegex)
-				fileList = ''
-			end
+	if nodesInOrbit == 16 then
+		-- Every 30 and 45 degrees, per https://github.com/grindinggear/skilltree-export/blob/3.17.0/README.md
+		orbitAngles = { 0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330 }
+	elseif nodesInOrbit == 40 then
+		-- Every 10 and 45 degrees
+		orbitAngles = { 0, 10, 20, 30, 40, 45, 50, 60, 70, 80, 90, 100, 110, 120, 130, 135, 140, 150, 160, 170, 180, 190, 200, 210, 220, 225, 230, 240, 250, 260, 270, 280, 290, 300, 310, 315, 320, 330, 340, 350 }
+	else
+		-- Uniformly spaced
+		for i = 0, nodesInOrbit do
+			orbitAngles[i + 1] = 360 * i / nodesInOrbit
 		end
 	end
 
-	if fileList:len() > 0 then
-		main.ggpk:ExtractFilesWithBun(fileList, useRegex)
-		fileList = ''
+	for i, degrees in ipairs(orbitAngles) do
+		orbitAngles[i] = math.rad(degrees)
 	end
+
+	return orbitAngles
 end
 
 local function bits(int, s, e)
@@ -75,6 +75,37 @@ end
 local function round_to(num, decimal_places)
     local multiplier = 10 ^ decimal_places
     return math.floor(num * multiplier + 0.5) / multiplier
+end
+
+local function extractSheetFiles(allSheets, is4kEnabled, extraFiles)
+	local filesToExtract = {}
+	local seen = {}
+	for _, sheet in ipairs(allSheets) do
+		for icon in pairs(sheet.files) do
+			if not seen[icon] then
+				seen[icon] = true
+				table.insert(filesToExtract, icon)
+			end
+			if is4kEnabled then
+				local icon4k = icon:gsub("(.*/)([^/]+)$", "%14k/%2")
+				if not seen[icon4k] then
+					seen[icon4k] = true
+					table.insert(filesToExtract, icon4k)
+				end
+			end
+		end
+	end
+	if extraFiles then
+		for _, file in ipairs(extraFiles) do
+			if not seen[file] then
+				seen[file] = true
+				table.insert(filesToExtract, file)
+			end
+		end
+	end
+	if #filesToExtract > 0 then
+		main.ggpk:ExtractList(filesToExtract, cacheExtract)
+	end
 end
 
 local function print_table(t, indent)
@@ -132,19 +163,7 @@ local function calculateDDSPack(sheet, from_base, to_base, is4kEnabled)
 	local stackTextures = {}
 	local ddsCoords = {}
 
-	-- extract all files first from GGG pack
-	local filesToExtract = { }
-	for icon, _ in pairs(sheet.files) do
-		table.insert(filesToExtract, icon)
-
-		if is4kEnabled then
-			local icon4k = icon:gsub("(.*/)([^/]+)$", "%14k/%2")
-			table.insert(filesToExtract, icon4k)
-		end
-	end
-	extractFromGgpk(filesToExtract)
-
-	for icon, sections in pairs(sheet.files) do
+	for icon, sections in pairsSortByKey(sheet.files) do
 		local tex = Texture.new()
 		local rc
 		if is4kEnabled then
@@ -170,7 +189,7 @@ local function calculateDDSPack(sheet, from_base, to_base, is4kEnabled)
 	end
 
 
-	for iden, stackInfo in pairs(stackTextures) do
+	for iden, stackInfo in pairsSortByKey(stackTextures) do
 		local stacks = {}
 		local file = sheet.name .. "_" .. iden .. ".dds.zst"
 		ddsCoords[file] = {}
@@ -190,13 +209,11 @@ local function calculateDDSPack(sheet, from_base, to_base, is4kEnabled)
 	sheet.ddsCoords = ddsCoords
 end
 
-local function parseUIImages()
-	local file = "art/uiimages1.txt"
+local function parseUIImages(file)
 	local text
 	if main.ggpk.txt[file] then
 		text = main.ggpk.txt[file]
 	else
-		extractFromGgpk({file})
 		text = convertUTF16to8(getFile(file))
 		main.ggpk.txt[file] = text
 	end
@@ -238,12 +255,6 @@ end
 			- check version (only support version 3 for now)
 --]]
 
--- parse UI Images
-printf("Getting UIImages ...")
-local uiImages = parseUIImages()
--- uncomment next line if wanna print what we found
--- print_table(uiImages, 0)
-
 -- Set to true if you want to generate assets
 local generateAssets = false
 local use4kIfPossible = false
@@ -251,7 +262,7 @@ local use4kIfPossible = false
 local idPassiveTree = 'Default'
 -- Find a way to get version
 local basePath = GetWorkDir() .. "/../TreeData/"
-local version = "0_1"
+local version = "0_4"
 local path = basePath .. version .. "/"
 local fileTree = path .. "tree.lua"
 
@@ -265,12 +276,18 @@ if rowPassiveTree == nil then
 end
 
 local psgFile = rowPassiveTree.PassiveSkillGraph .. ".psg"
+local uiImagesFile = "art/uiimages1.txt"
 
-printf("Extracting passives tree " .. idPassiveTree .. " from " .. psgFile)
+printf("Extracting required assets (psg + ui images)...")
+main.ggpk:ExtractList({psgFile, uiImagesFile}, cacheExtract)
 
-extractFromGgpk({psgFile})
+-- parse UI Images
+--printf("Getting UIImages ...")
+local uiImages = parseUIImages(uiImagesFile)
+-- uncomment next line if wanna print what we found
+-- print_table(uiImages, 0)
 
-printf("Parsing passives tree " .. idPassiveTree .. " from " .. main.ggpk.oozPath .. psgFile)
+--printf("Parsing passives tree " .. idPassiveTree .. " from " .. main.ggpk.oozPath .. psgFile)
 
 local f = io.open(main.ggpk.oozPath .. psgFile, "rb")
 
@@ -288,18 +305,18 @@ local psg = {
 	groups = { },
 }
 
-printf("Parsing passives...")
+--printf("Parsing passives...")
 local passivesCount = getInt(f)
 
-printf("Passive count: " .. passivesCount)
+--printf("Passive count: " .. passivesCount)
 for i = 1 , passivesCount do
 	table.insert(psg.passives, getLong(f))
 end
 
-printf("Parsing groups...")
+--printf("Parsing groups...")
 local groupCount = getInt(f)
 
-printf("Group count: " .. groupCount)
+--printf("Group count: " .. groupCount)
 for i = 1 , groupCount do
 	local group = { 
 		x = getFloat(f),
@@ -336,7 +353,7 @@ end
 
 f:close()
 
-printf("Passives tree " .. idPassiveTree .. " parsed")
+--printf("Passives tree " .. idPassiveTree .. " parsed")
 
 -- uncomment next line if wanna print what we found
 -- print_table(psg, 0)
@@ -373,6 +390,7 @@ local sheets = {
 	newSheet("lines", defaultMaxWidth, 100),
 	newSheet("jewel-sockets", defaultMaxWidth, 100),
 	newSheet("legion", defaultMaxWidth, 100),
+	newSheet("monster-categories", defaultMaxWidth, 100),
 }
 local sheetLocations = {
 	["skills"] = 1,
@@ -385,13 +403,55 @@ local sheetLocations = {
 	["lines"] = 8,
 	["jewel-sockets"] = 9,
 	["legion"] = 10,
+	["monster-categories"] = 11,
 }
+local connectionArtToDecompose = {
+	Character = true,
+	CharacterAscendancy = true,
+	--AbyssLichAscendancy = true, Currently breaks the GIMP mask script so can't include it atm
+	CharacterPlanned = true,
+}
+
+local linesFiles = {}
+local linesDds = {}
+do
+	local typeOfConnections = {
+		"Normal", "Intermediate", "IntermediateActive"
+	}
+
+	for connectionArtId in pairs(connectionArtToDecompose) do
+		local connectionArt = dat("PassiveSkillTreeConnectionArt"):GetRow("Id", connectionArtId)
+		if connectionArt == nil then
+			printf("Connection art " .. connectionArtId .. " not found")
+		else
+			for _, typeName in ipairs(typeOfConnections) do
+				local linesFile = {
+					file = connectionArt[typeName],
+					mask = connectionArt.Mask,
+					extension = ".png",
+					basename = connectionArtId .. "_orbit_" .. string.lower(typeName),
+					first = connectionArtId .. "LineConnector",
+					prefix = connectionArtId .. "Orbit",
+					postfix = typeName == "IntermediateActive" and "Active" or typeName,
+					total = 10
+				}
+				table.insert(linesFiles, linesFile)
+			end
+		end
+	end
+
+	for _, lines in ipairs(linesFiles) do
+		table.insert(linesDds, lines.file)
+		table.insert(linesDds, lines.mask)
+	end
+end
+
 local function getSheet(sheetLocation)
 	return sheets[sheetLocations[sheetLocation]]
 end
 
 -- Looking for Background2
-printf("Extracting Background2...")
+--printf("Extracting Background2...")
 local bg2 = uiImages["art/2dart/uiimages/common/background2"]
 if not bg2 then
 	printf("Background2 not found")
@@ -402,7 +462,7 @@ end
 addToSheet(getSheet("background"), bg2.path, "background", commonMetadata("Background2"))
 
 -- add Group Background base ond UIArt from PassiveTree\
-printf("Getting Background Group...")
+--printf("Getting Background Group...")
 local uIArt = rowPassiveTree.UIArt
 
 local gBgSmall = uiImages[string.lower(uIArt.GroupBackgroundSmall)].path
@@ -414,75 +474,60 @@ addToSheet(getSheet("group-background"), gBgMedium, "groupBackground", commonMet
 local gBgLarge = uiImages[string.lower(uIArt.GroupBackgroundLarge)].path
 addToSheet(getSheet("group-background"), gBgLarge, "groupBackground", commonMetadata("PSGroupBackground3"))
 
-printf("Getting PassiveFrame")
-local pFrameNormal = uiImages[string.lower(uIArt.PassiveFrameNormal)].path
+--printf("Getting PassiveFrame")
+local pFrameNormal = uiImages[string.lower(uIArt.PassiveFrame.Normal)].path
 addToSheet(getSheet("group-background"), pFrameNormal, "frame", commonMetadata("PSSkillFrame"))
 
-local pFrameActive = uiImages[string.lower(uIArt.PassiveFrameActive)].path
+local pFrameActive = uiImages[string.lower(uIArt.PassiveFrame.Active)].path
 addToSheet(getSheet("group-background"), pFrameActive, "frame", commonMetadata("PSSkillFrameActive"))
 
-local pFrameCanAllocate = uiImages[string.lower(uIArt.PassiveFrameCanAllocate)].path
+local pFrameCanAllocate = uiImages[string.lower(uIArt.PassiveFrame.CanAllocate)].path
 addToSheet(getSheet("group-background"), pFrameCanAllocate, "frame", commonMetadata("PSSkillFrameHighlighted"))
 
-printf("Getting KeystoneFrame")
-local kFrameNormal = uiImages[string.lower(uIArt.KeystoneFrameNormal)].path
+--printf("Getting KeystoneFrame")
+local kFrameNormal = uiImages[string.lower(uIArt.KeystoneFrame.Normal)].path
 addToSheet(getSheet("group-background"), kFrameNormal, "frame", commonMetadata("KeystoneFrameUnallocated"))
 
-local kFrameActive = uiImages[string.lower(uIArt.KeystoneFrameActive)].path
+local kFrameActive = uiImages[string.lower(uIArt.KeystoneFrame.Active)].path
 addToSheet(getSheet("group-background"), kFrameActive, "frame", commonMetadata("KeystoneFrameAllocated"))
 
-local kFrameCanAllocate = uiImages[string.lower(uIArt.KeystoneFrameCanAllocate)].path
+local kFrameCanAllocate = uiImages[string.lower(uIArt.KeystoneFrame.CanAllocate)].path
 addToSheet(getSheet("group-background"), kFrameCanAllocate, "frame", commonMetadata("KeystoneFrameCanAllocate"))
 
-printf("Getting NotableFrame")
-local nFrameNormal = uiImages[string.lower(uIArt.NotableFrameNormal)].path
+--printf("Getting NotableFrame")
+local nFrameNormal = uiImages[string.lower(uIArt.NotableFrame.Normal)].path
 addToSheet(getSheet("group-background"), nFrameNormal, "frame", commonMetadata("NotableFrameUnallocated"))
 
-local nFrameActive = uiImages[string.lower(uIArt.NotableFrameActive)].path
+local nFrameActive = uiImages[string.lower(uIArt.NotableFrame.Active)].path
 addToSheet(getSheet("group-background"), nFrameActive, "frame", commonMetadata("NotableFrameAllocated"))
 
-local nFrameCanAllocate = uiImages[string.lower(uIArt.NotableFrameCanAllocate)].path
+local nFrameCanAllocate = uiImages[string.lower(uIArt.NotableFrame.CanAllocate)].path
 addToSheet(getSheet("group-background"), nFrameCanAllocate, "frame", commonMetadata("NotableFrameCanAllocate"))
 
-printf("Getting GroupBackgroundBlank")
-local gBgSmallBlank = uiImages[string.lower(uIArt.GroupBackgroundSmallBlank)].path
+--printf("Getting GroupBackgroundBlank")
+local gBgSmallBlank = uiImages[string.lower(uIArt.GroupBackgroundSmall)].path
 addToSheet(getSheet("group-background"), gBgSmallBlank, "groupBackground", commonMetadata("PSGroupBackgroundSmallBlank"))
 
-local gBgMediumBlank = uiImages[string.lower(uIArt.GroupBackgroundMediumBlank)].path
+local gBgMediumBlank = uiImages[string.lower(uIArt.GroupBackgroundMedium)].path
 addToSheet(getSheet("group-background"), gBgMediumBlank, "groupBackground", commonMetadata("PSGroupBackgroundMediumBlank"))
 
-local gBgLargeBlank = uiImages[string.lower(uIArt.GroupBackgroundLargeBlank)].path
+local gBgLargeBlank = uiImages[string.lower(uIArt.GroupBackgroundLarge)].path
 addToSheet(getSheet("group-background"), gBgLargeBlank, "groupBackground", commonMetadata("PSGroupBackgroundLargeBlank"))
 
-printf("Getting JewelSocketFrame")
-local jFrameNormal = uiImages[string.lower("Art/2DArt/UIImages/InGame/SanctumPassiveSkillScreenJewelSocketCanAllocate")].path
+--printf("Getting JewelSocketFrame")
+local jFrameNormal = uiImages[string.lower(uIArt.JewelFrame.CanAllocate)].path
 addToSheet(getSheet("group-background"), jFrameNormal, "frame", commonMetadata("JewelFrameCanAllocate"))
 
-local jFrameActive = uiImages[string.lower("Art/2DArt/UIImages/InGame/SanctumPassiveSkillScreenJewelSocketActive")].path
+local jFrameActive = uiImages[string.lower(uIArt.JewelFrame.Active)].path
 addToSheet(getSheet("group-background"), jFrameActive, "frame", commonMetadata("JewelFrameAllocated"))
 
-local jFrameCanAllocate = uiImages[string.lower("Art/2DArt/UIImages/InGame/SanctumPassiveSkillScreenJewelSocketNormal")].path
+local jFrameCanAllocate = uiImages[string.lower(uIArt.JewelFrame.Normal)].path
 addToSheet(getSheet("group-background"), jFrameCanAllocate, "frame", commonMetadata("JewelFrameUnallocated"))
 
-printf("Getting Ascendancy frames")
-local ascFrameNormal = uiImages[string.lower("Art/2DArt/UIImages/InGame/PassiveSkillScreenAscendancyFrameSmallCanAllocate")].path
-addToSheet(getSheet("group-background"), ascFrameNormal, "frame", commonMetadata("AscendancyFrameSmallCanAllocate"))
+--print("Getting Orbits art")
+connectionArtToDecompose[uIArt.ConnectionsArt.Id] = true
 
-local ascFrameActive = uiImages[string.lower("Art/2DArt/UIImages/InGame/PassiveSkillScreenAscendancyFrameSmallNormal")].path
-addToSheet(getSheet("group-background"), ascFrameActive, "frame", commonMetadata("AscendancyFrameSmallNormal"))
-
-local ascFrameCanAllocate = uiImages[string.lower("Art/2DArt/UIImages/InGame/PassiveSkillScreenAscendancyFrameSmallAllocated")].path
-addToSheet(getSheet("group-background"), ascFrameCanAllocate, "frame", commonMetadata("AscendancyFrameSmallAllocated"))
-
-local ascFrameLargeNormal = uiImages[string.lower("Art/2DArt/UIImages/InGame/PassiveSkillScreenAscendancyFrameLargeNormal")].path
-addToSheet(getSheet("group-background"), ascFrameLargeNormal, "frame", commonMetadata("AscendancyFrameLargeNormal"))
-
-local ascFrameLargeCanAllocate = uiImages[string.lower("Art/2DArt/UIImages/InGame/PassiveSkillScreenAscendancyFrameLargeCanAllocate")].path
-addToSheet(getSheet("group-background"), ascFrameLargeCanAllocate, "frame", commonMetadata("AscendancyFrameLargeCanAllocate"))
-
-local ascFrameLargeAllocated = uiImages[string.lower("Art/2DArt/UIImages/InGame/PassiveSkillScreenAscendancyFrameLargeAllocated")].path
-addToSheet(getSheet("group-background"), ascFrameLargeAllocated, "frame", commonMetadata("AscendancyFrameLargeAllocated"))
-
+--printf("Getting Ascendancy frames")
 local ascMiddle = uiImages[string.lower("Art/2DArt/UIImages/InGame/PassiveSkillScreenAscendancyMiddle")].path
 addToSheet(getSheet("group-background"), ascMiddle, "frame", commonMetadata("AscendancyMiddle"))
 
@@ -493,18 +538,46 @@ addToSheet(getSheet("group-background"), ascStart, "startNode", commonMetadata("
 addToSheet(getSheet("ascendancy-background"), "art/textures/interface/2d/2dart/uiimages/ingame/passivetree/passivetreemaincircle.dds", "AscendancyBackground", commonMetadata("BGTree"))
 addToSheet(getSheet("ascendancy-background"), "art/textures/interface/2d/2dart/uiimages/ingame/passivetree/passivetreemaincircleactive2.dds", "AscendancyBackground", commonMetadata("BGTreeActive"))
 
--- adding lines to sprite
-addToSheet(getSheet("lines"), "art/2dart/passivetree/passiveskillscreencurvesactivetogether.dds", "line", commonMetadata( "CurvesActive"))
-addToSheet(getSheet("lines"), "art/2dart/passivetree/passiveskillscreencurvesintermediatetogether.dds", "line", commonMetadata( "CurvesIntermediate"))
-addToSheet(getSheet("lines"), "art/2dart/passivetree/passiveskillscreencurvesnormaltogether.dds", "line", commonMetadata( "CurvesNormal"))
-
 -- adding jewel sockets
 local jewelArt = dat("PassiveJewelArt")
 for jewel in jewelArt:Rows() do
+	if jewel.Item.Name:find(ignoreFilter) ~= nil then
+		printf("Ignoring jewel socket " .. jewel.Item.Name)
+		goto nexttogo
+	end
 	local asset = uiImages[string.lower(jewel.JewelArt)]
-	printf("Adding jewel socket " .. jewel.Item.Name .. " " .. asset.path .. " to sprite")
 	local name = jewel.Item.Name
+	--printf("Adding jewel socket " .. name .. " " .. asset.path .. " to sprite")
 	addToSheet(getSheet("jewel-sockets"), asset.path, "jewelpassive", commonMetadata(name))
+	:: nexttogo	::
+end
+
+-- adding unique jewel sockets
+local uniqueJewelArt = dat("PassiveJewelUniqueArt")
+for jewel in uniqueJewelArt:Rows() do
+	if jewel.WordsKey.Text:find(ignoreFilter) ~= nil then
+		printf("Ignoring unique jewel socket " .. jewel.Item.Name)
+		goto nexttogo
+	end
+	local asset = uiImages[string.lower(jewel.JewelArt)]
+	local name = jewel.WordsKey.Text
+	--printf("Adding unique jewel socket " .. name .. " " .. asset.path .. " to sprite")
+	addToSheet(getSheet("jewel-sockets"), asset.path, "jewelpassive", commonMetadata(name))
+	:: nexttogo ::
+end
+
+-- adding monster types
+local monsterCategories = dat("MonsterCategories")
+for category in monsterCategories:Rows() do
+	if category.Type:find(ignoreFilter) ~= nil then
+		printf("Ignoring category" .. category.Type)
+		goto nexttogo
+	end
+	local asset = uiImages[string.lower(category.HudImage)]
+	--printf("Adding category " .. category.Type .. " " .. asset.path .. " to sprite")
+	local name = category.Type
+	addToSheet(getSheet("monster-categories"), asset.path, "monster-categories", commonMetadata(name))
+	:: nexttogo	::
 end
 
 -- adding legion assets
@@ -514,18 +587,19 @@ end
 
 
 local artsToLegion = {
-	"Art/2DArt/UIImages/InGame/PassiveSkillScreenMarakethJewelCircle2",
-	"Art/2DArt/UIImages/InGame/PassiveSkillScreenKalguuranJewelCircle1",
-	"Art/2DArt/UIImages/InGame/PassiveSkillScreenKaruiJewelCircle2",
+	"Art/2DArt/UIImages/InGame/Abyss/AbyssPassiveSkillScreenJewelCircle1",
 	"Art/2DArt/UIImages/InGame/PassiveSkillScreenEternalEmpireJewelCircle1",
 	"Art/2DArt/UIImages/InGame/PassiveSkillScreenEternalEmpireJewelCircle2",
-	"Art/2DArt/UIImages/InGame/PassiveSkillScreenTemplarJewelCircle2",
-	"Art/2DArt/UIImages/InGame/PassiveSkillScreenTemplarJewelCircle1",
-	"Art/2DArt/UIImages/InGame/PassiveSkillScreenVaalJewelCircle2",
+	"Art/2DArt/UIImages/InGame/PassiveSkillScreenKalguuranJewelCircle1",
 	"Art/2DArt/UIImages/InGame/PassiveSkillScreenKalguuranJewelCircle2",
 	"Art/2DArt/UIImages/InGame/PassiveSkillScreenKaruiJewelCircle1",
+	"Art/2DArt/UIImages/InGame/PassiveSkillScreenKaruiJewelCircle2",
+	"Art/2DArt/UIImages/InGame/PassiveSkillScreenMarakethJewelCircle1",
+	"Art/2DArt/UIImages/InGame/PassiveSkillScreenMarakethJewelCircle2",
+	"Art/2DArt/UIImages/InGame/PassiveSkillScreenTemplarJewelCircle1",
+	"Art/2DArt/UIImages/InGame/PassiveSkillScreenTemplarJewelCircle2",
 	"Art/2DArt/UIImages/InGame/PassiveSkillScreenVaalJewelCircle1",
-	"Art/2DArt/UIImages/InGame/PassiveSkillScreenMarakethJewelCircle1"
+	"Art/2DArt/UIImages/InGame/PassiveSkillScreenVaalJewelCircle2",
 }
 
 for _, art in ipairs(artsToLegion) do
@@ -536,39 +610,67 @@ end
 local tree = {
 	["tree"] = idPassiveTree,
 	["min_x"]= 0,
-    ["min_y"]= 0,
-    ["max_x"]= 0,
-    ["max_y"]= 0,
+	["min_y"]= 0,
+	["max_x"]= 0,
+	["max_y"]= 0,
 	["classes"] = {},
 	["groups"] = { },
 	["nodes"]= { },
 	["assets"]={},
 	["ddsCoords"] = {},
+	["jewelSlots"] = {},
 	["constants"]= { -- calculate this
-        ["classes"]= {
-            ["StrDexIntClass"]= 0,
-            ["StrClass"]= 1,
-            ["DexClass"]= 2,
-            ["IntClass"]= 3,
-            ["StrDexClass"]= 4,
-            ["StrIntClass"]= 5,
-            ["DexIntClass"]= 6
-        },
-        ["characterAttributes"]= {
-            ["Strength"]= 0,
-            ["Dexterity"]= 1,
-            ["Intelligence"]= 2
-        },
-        ["PSSCentreInnerRadius"]= 130,
-        ["skillsPerOrbit"]= {},
-        ["orbitRadii"]= {
+		["classes"]= {
+			["StrDexIntClass"]= 0,
+			["StrClass"]= 1,
+			["DexClass"]= 2,
+			["IntClass"]= 3,
+			["StrDexClass"]= 4,
+			["StrIntClass"]= 5,
+			["DexIntClass"]= 6
+		},
+		["characterAttributes"]= {
+			["Strength"]= 0,
+			["Dexterity"]= 1,
+			["Intelligence"]= 2
+		},
+		["PSSCentreInnerRadius"]= 130,
+		["skillsPerOrbit"]= {},
+		["orbitAnglesByOrbit"] = {},
+		["orbitRadii"]= {
 			0, 82, 162, 335, 493, 662, 846, 251, 1080, 1322
-        }
-    },
+		},
+	},
+	["nodeOverlay"] = {
+		Normal = {
+			alloc = "PSSkillFrameActive",
+			path = "PSSkillFrameHighlighted",
+			unalloc = "PSSkillFrame",
+		},
+		Notable = {
+			alloc = "NotableFrameAllocated",
+			path = "NotableFrameCanAllocate",
+			unalloc = "NotableFrameUnallocated",
+		},
+		Keystone = {
+			alloc = "KeystoneFrameAllocated",
+			path = "KeystoneFrameCanAllocate",
+			unalloc = "KeystoneFrameUnallocated",
+		},
+		Socket = {
+			alloc = "JewelFrameAllocated",
+			path = "JewelFrameCanAllocate",
+			unalloc = "JewelFrameUnallocated",
+		},
+	},
+	["connectionArt"] = {
+		default = "Character",
+		ascendancy = "CharacterAscendancy",
+	},
 }
 
 printf("Generating classes...")
-local ignoreFilter = "^%[DNT%]"
+local ascedancyReplacements = {}
 for i, classId in ipairs(psg.passives) do
 	local passiveRow = dat("passiveskills"):GetRow("PassiveSkillNodeId", classId)
 	if passiveRow == nil then
@@ -577,7 +679,7 @@ for i, classId in ipairs(psg.passives) do
 	end
 
 	if passiveRow.Name:find(ignoreFilter) ~= nil then
-		printf("Ignoring class " .. passiveRow.Name)
+		--printf("Ignoring class " .. passiveRow.Name)
 		goto continue
 	end
 
@@ -590,15 +692,26 @@ for i, classId in ipairs(psg.passives) do
 
 	for j, character in ipairs(listCharacters) do
 		if character.Name:find(ignoreFilter) ~= nil then
-			printf("Ignoring character " .. character.Name)
+			--printf("Ignoring character " .. character.Name)
 			goto continue2
 		end
 		local classDef = {
 			["name"] = character.Name,
+			["integerId"] = character.IntegerId,
 			["base_str"] = character.BaseStrength,
 			["base_dex"] = character.BaseDexterity,
 			["base_int"] = character.BaseIntelligence,
 			["ascendancies"] = {},
+			["background"] = {
+				["active"] = { width = 2000, height = 2000 },
+				["bg"] = { width = 2000, height = 2000 },
+				image = "Classes" .. character.Name,
+				section = "AscendancyBackground",
+				x = 0,
+				y = 0,
+				width = 1500,
+				height = 1500
+			}
 		}
 
 		-- add assets
@@ -609,23 +722,54 @@ for i, classId in ipairs(psg.passives) do
 
 		local ascendancies = dat("ascendancy"):GetRowList("Class", character)
 		for k, ascendency in ipairs(ascendancies) do
-			if ascendency.Name:find(ignoreFilter) ~= nil then
-				printf("Ignoring ascendency " .. ascendency.Name .. " for class " .. character.Name)
+			if ascendency.Name:find(ignoreFilter) ~= nil or ascendency.isDisabled then
+				--printf("Ignoring ascendency " .. ascendency.Name .. " for class " .. character.Name)
 				goto continue3
+			end
+			if ascendency.Replace then
+				ascedancyReplacements[ascendency.Replace.Name] = ascendency.Name
 			end
 			table.insert(classDef.ascendancies, {
 				["id"] = ascendency.Name,
 				["name"] = ascendency.Name,
+				["internalId"] = ascendency.Id,
+				["replace"] = ascendency.Replace and ascendency.Replace.Name or nil,
+				["background"] = {
+					image = "Classes" .. ascendency.Name,
+					section = "AscendancyBackground",
+					x = 0,
+					y = 0,
+					width = 1500,
+					height = 1500
+				}
 			})
 
 			-- add assets
 			addToSheet(getSheet("ascendancy-background"), ascendency.PassiveTreeImage, "AscendancyBackground", commonMetadata( "Classes" .. ascendency.Name))
 
+			--printf("Getting Ascendancy frames " .. ascendency.Name)
+			local ascFrameNormal = uiImages[string.lower(ascendency.UIArt.PassiveFrame.CanAllocate)].path
+			addToSheet(getSheet("group-background"), ascFrameNormal, "frame", commonMetadata(ascendency.Name .. "FrameSmallCanAllocate"))
+
+			local ascFrameActive = uiImages[string.lower(ascendency.UIArt.PassiveFrame.Normal)].path
+			addToSheet(getSheet("group-background"), ascFrameActive, "frame", commonMetadata(ascendency.Name .. "FrameSmallNormal"))
+
+			local ascFrameCanAllocate = uiImages[string.lower(ascendency.UIArt.PassiveFrame.Active)].path
+			addToSheet(getSheet("group-background"), ascFrameCanAllocate, "frame", commonMetadata(ascendency.Name .. "FrameSmallAllocated"))
+
+			local ascFrameLargeNormal = uiImages[string.lower(ascendency.UIArt.NotableFrame.Normal)].path
+			addToSheet(getSheet("group-background"), ascFrameLargeNormal, "frame", commonMetadata(ascendency.Name .. "FrameLargeNormal"))
+
+			local ascFrameLargeCanAllocate = uiImages[string.lower(ascendency.UIArt.NotableFrame.CanAllocate)].path
+			addToSheet(getSheet("group-background"), ascFrameLargeCanAllocate, "frame", commonMetadata(ascendency.Name .. "FrameLargeCanAllocate"))
+
+			local ascFrameLargeAllocated = uiImages[string.lower(ascendency.UIArt.NotableFrame.Active)].path
+			addToSheet(getSheet("group-background"), ascFrameLargeAllocated, "frame", commonMetadata(ascendency.Name .. "FrameLargeAllocated"))
 			:: continue3 ::
 		end
 
 		if #classDef.ascendancies == 0 then
-			printf("No ascendancies found for class " .. character.Name)
+			--printf("No ascendancies found for class " .. character.Name)
 			goto continue2
 		end
 		table.insert(tree.classes,classDef)
@@ -704,14 +848,22 @@ for i, group in ipairs(psg.groups) do
 		-- Get Information from passive Skill
 		local passiveRow = dat("passiveskills"):GetRow("PassiveSkillNodeId", passive.id)
 		if passiveRow == nil then
-			printf("Passive skill " .. passive.id .. " not found")
+			--printf("Passive skill " .. passive.id .. " not found")
 		else
-			if passiveRow.Name:find(ignoreFilter) ~= nil then
-				printf("Ignoring passive skill " .. passiveRow.Name)
+			if passiveRow.Name == "" then
+				--printf("Ignoring passive skill " .. passive.id .. " No name")
 				goto exitNode
 			end
+			if passiveRow.Name:find(ignoreFilter) ~= nil and passiveRow.Name ~= "[DNT] Kite Fisher" and passiveRow.Name ~= "[DNT] Troller" and passiveRow.Name ~= "[DNT] Spearfisher" and passiveRow.Name ~= "[DNT] Angler" and passiveRow.Name ~= "[DNT] Whaler" then
+				--printf("Ignoring passive skill " .. passiveRow.Name)
+				goto exitNode
+			end
+			--printf("Passive skill " .. passiveRow.Name .. "(id: " .. passiveRow.Id .. ") found")
 			node["name"] = escapeGGGString(passiveRow.Name)
 			node["icon"] = passiveRow.Icon
+			if passiveRow.FlavourText ~= "" then
+				node["flavourText"] = passiveRow.FlavourText:gsub('\r',''):gsub('\n','\\n')
+			end
 			if passiveRow.Keystone then
 				node["isKeystone"] = true
 				addToSheet(getSheet("skills"), passiveRow.Icon, "keystoneActive", commonMetadata(nil))
@@ -734,17 +886,90 @@ for i, group in ipairs(psg.groups) do
 			-- Ascendancy
 			if passiveRow.Ascendancy ~= nil then
 				groupIsAscendancy = true
-				if passiveRow.Ascendancy.Name:find(ignoreFilter) ~= nil then
-					printf("Ignoring node ascendancy " .. passiveRow.Ascendancy.Name)
+				if passiveRow.Ascendancy.Name:find(ignoreFilter) ~= nil or passiveRow.Ascendancy.isDisabled then
+					--printf("Ignoring node ascendancy " .. passiveRow.Ascendancy.Name)
 					goto exitNode
 				end
 				node["ascendancyName"] = passiveRow.Ascendancy.Name
 				node["isAscendancyStart"] = passiveRow.AscendancyStart or nil
+				if node["isAscendancyStart"] then
+					node["name"] = passiveRow.Ascendancy.Name
+				end
+
+				-- support for jewel sockets in ascendancy
+				if passiveRow.JewelSocket then
+					node["containJewelSocket"] = true
+
+					local uioverride = passiveRow.Ascendancy.UIArt.JewelFrame
+					if uioverride then
+						local uiSocketNormal = uiImages[string.lower(uioverride.Normal)]
+						addToSheet(getSheet("group-background"), uiSocketNormal.path, "frame", commonMetadata(nil))
+
+						local uiSocketActive = uiImages[string.lower(uioverride.Active)]
+						addToSheet(getSheet("group-background"), uiSocketActive.path, "frame", commonMetadata(nil))
+
+						local uiSocketCanAllocate = uiImages[string.lower(uioverride.CanAllocate)]
+						addToSheet(getSheet("group-background"), uiSocketCanAllocate.path, "frame", commonMetadata(nil))
+
+						node.nodeOverlay = {
+							alloc = uiSocketActive.path,
+							path = uiSocketCanAllocate.path,
+							unalloc = uiSocketNormal.path,
+						}
+						
+					else
+						--printf("Jewel socket not found for ascendancy " .. passiveRow.Ascendancy.Name)
+					end
+				elseif node["isOnlyImage"] == nil then
+					local typeFrame = node["isNotable"] and "Large" or "Small"
+					node.nodeOverlay = {
+						alloc = passiveRow.Ascendancy.Name .. "Frame" .. typeFrame .. "Allocated",
+						path = passiveRow.Ascendancy.Name .. "Frame" .. typeFrame .. "CanAllocate",
+						unalloc = passiveRow.Ascendancy.Name .. "Frame" .. typeFrame .. "Normal",
+					}
+				end
 
 				ascendancyGroups = ascendancyGroups or {}
 				ascendancyGroups[passiveRow.Ascendancy.Name] = ascendancyGroups[passiveRow.Ascendancy.Name] or { }
 				ascendancyGroups[passiveRow.Ascendancy.Name].startId = passiveRow.AscendancyStart and passive.id or ascendancyGroups[passiveRow.Ascendancy.Name].startId
 				ascendancyGroups[passiveRow.Ascendancy.Name][i] = true
+			end
+
+			-- enable custom frameArt by node
+			if passiveRow.FrameArt ~= nil and node["isOnlyImage"] == nil then
+				local frameArt = passiveRow.FrameArt
+				if frameArt ~= nil then
+					local uiNormal = uiImages[string.lower(frameArt.Normal)]
+					addToSheet(getSheet("group-background"), uiNormal.path, "frame", commonMetadata(nil))
+
+					local uiActive = uiImages[string.lower(frameArt.Active)]
+					addToSheet(getSheet("group-background"), uiActive.path, "frame", commonMetadata(nil))
+
+					local uiCanAllocate = uiImages[string.lower(frameArt.CanAllocate)]
+					addToSheet(getSheet("group-background"), uiCanAllocate.path, "frame", commonMetadata(nil))
+
+					node.nodeOverlay = {
+						alloc = uiActive.path,
+						path = uiCanAllocate.path,
+						unalloc = uiNormal.path,
+					}
+				end
+			end
+
+			-- Enable Ascendancy Unlock
+			if passiveRow.AscendancyUnlock ~= nil then
+				node.unlockConstraint = {
+					ascendancy = passiveRow.AscendancyUnlock.Name,
+					nodes = {}
+				}
+
+				for id, refNode in ipairs(passiveRow.ConstraintNode) do
+					--printf(" - adding node " .. refNode.Name .. " to unlock constraint")
+					node.unlockConstraint.nodes[id] = refNode.PassiveSkillNodeId
+				end
+
+				-- enable the alternative connectionArt for this node
+				node.connectionArt = "CharacterPlanned"
 			end
 
 			-- Stats
@@ -783,10 +1008,10 @@ for i, group in ipairs(psg.groups) do
 
 			-- support for images
 			if passiveRow.MasteryGroup ~= nil then
-				node["activeEffectImage"] = passiveRow.MasteryGroup.Background
+				node["activeEffectImage"] = passiveRow.MasteryGroup.MasteryArt.Effect
 
-				local uiEffect = uiImages[string.lower(passiveRow.MasteryGroup.Background)]
-				addToSheet(getSheet("mastery-active-effect"), uiEffect.path, "masteryActiveEffect", commonMetadata(passiveRow.MasteryGroup.Background))
+				local uiEffect = uiImages[string.lower(passiveRow.MasteryGroup.MasteryArt.Effect)]
+				addToSheet(getSheet("mastery-active-effect"), uiEffect.path, "masteryActiveEffect", commonMetadata(passiveRow.MasteryGroup.MasteryArt.Effect))
 			end
 
 			-- if the passive is "Attribute" we are going to add values
@@ -808,17 +1033,17 @@ for i, group in ipairs(psg.groups) do
 				node["stats"] = node["stats"] or {}
 
 				for _, gemEffect in pairs(passiveRow.GrantedSkill.GemEffects) do
-					local skillName = gemEffect.GrantedEffect.ActiveSkill.DisplayName
+					local skillName = passiveRow.GrantedSkill.BaseItemType.Name
 					table.insert(node["stats"], "Grants Skill: " .. skillName)
 
 					-- -- include the stat description
-					local statDescription =string.sub(string.lower(gemEffect.GrantedEffect.ActiveSkill.StatDescription), 1, -2)
+					local statDescription =string.sub(string.lower(gemEffect.GrantedEffect.ActiveSkill.StatDescription), 1, -5)
 					local handle = NewFileSearch("ggpk/" .. statDescription ..".csd")
 					local almostOnce = false
 					while handle do
 						almostOnce = true
-						print(statDescription:gsub("metadata/statdescriptions", "") .. ".csd")
-						-- loadStatFile(statDescription:gsub("metadata/statdescriptions/", "") .. ".csd")
+						--print(statDescription:gsub("Data/StatDescriptions", "") .. ".csd")
+						-- loadStatFile(statDescription:gsub("Data/StatDescriptions/", "") .. ".csd")
 						if not handle:NextFile() then
 							break
 						end
@@ -889,6 +1114,72 @@ for i, group in ipairs(psg.groups) do
 				}
 			end
 
+			if passiveRow.Ascendancy and ascedancyReplacements[passiveRow.Ascendancy.Name] then
+				node["isSwitchable"] = true
+				local ascendancyRow = dat("ascendancy"):GetRow("Name", ascedancyReplacements[passiveRow.Ascendancy.Name])
+
+				local nodeInfo = {
+					["ascendancyName"] = ascedancyReplacements[passiveRow.Ascendancy.Name]
+				}
+
+				local switchNode = dat("ascendancypassiveskilloverrides"):GetRow("OriginalNode", passiveRow)
+				if switchNode then
+					nodeInfo.id = switchNode.SwitchedNode.PassiveSkillNodeId
+					nodeInfo.name = switchNode.SwitchedNode.Name
+					nodeInfo.icon = switchNode.SwitchedNode.Icon
+					nodeInfo.stats = {}
+
+					-- add to assets
+					addToSheet(getSheet("skills"), switchNode.SwitchedNode.Icon, "normalActive", commonMetadata(nil))
+					addToSheet(getSheet("skills-disabled"), switchNode.SwitchedNode.Icon, "normalInactive", commonMetadata(nil))
+
+					-- Stats
+					if switchNode.SwitchedNode.Stats ~= nil then
+						local parseStats = {}
+						for k, stat in ipairs(switchNode.SwitchedNode.Stats) do
+							parseStats[stat.Id] = { min = switchNode.SwitchedNode["Stat" .. k], max = switchNode.SwitchedNode["Stat" .. k] }
+						end
+						local out, orders = describeStats(parseStats)
+						for k, line in ipairs(out) do
+							table.insert(nodeInfo["stats"], line)
+						end
+					end
+				end
+
+				if passiveRow.JewelSocket and ascendancyRow.UIArt.JewelFrame then
+					-- override the jewel socket assets if any
+					local uioverride = ascendancyRow.UIArt.JewelFrame
+					
+					local uiSocketNormal = uiImages[string.lower(uioverride.Normal)]
+					addToSheet(getSheet("group-background"), uiSocketNormal.path, "frame", commonMetadata(nil))
+
+					local uiSocketActive = uiImages[string.lower(uioverride.Active)]
+					addToSheet(getSheet("group-background"), uiSocketActive.path, "frame", commonMetadata(nil))
+
+					local uiSocketCanAllocate = uiImages[string.lower(uioverride.CanAllocate)]
+					addToSheet(getSheet("group-background"), uiSocketCanAllocate.path, "frame", commonMetadata(nil))
+
+					nodeInfo.nodeOverlay = {
+						alloc = uiSocketActive.path,
+						path = uiSocketCanAllocate.path,
+						unalloc = uiSocketNormal.path,
+					}
+				elseif node["isOnlyImage"] == nil then
+					local typeFrame = nodeInfo["isNotable"] and "Large" or "Small"
+					nodeInfo.nodeOverlay = {
+						alloc = ascendancyRow.Name .. "Frame" .. typeFrame .. "Allocated",
+						path = ascendancyRow.Name .. "Frame" .. typeFrame .. "CanAllocate",
+						unalloc = ascendancyRow.Name .. "Frame" .. typeFrame .. "Normal",
+					}
+				end
+
+
+
+				node["options"] = {
+					[ascedancyReplacements[passiveRow.Ascendancy.Name]] = nodeInfo
+				}
+			end
+
 			-- classStartName
 			if #passiveRow.ClassStart > 0 then
 				node["classesStart"] = {}
@@ -905,6 +1196,15 @@ for i, group in ipairs(psg.groups) do
 			end
 			if passiveRow.MultipleChoiceOption then
 				node["isMultipleChoiceOption"] = true
+			end
+
+			-- Support for Smith of Kitava
+			if passiveRow["FreeAllocate"] == true then
+				node["isFreeAllocate"] = true
+			end
+
+			if passiveRow["ApplyToArmour?"] == true then
+				node["applyToArmour"] = true
 			end
 		end
 		
@@ -936,10 +1236,11 @@ for i, group in ipairs(psg.groups) do
 			tree.max_y = math.max(tree.max_y, group.y)
 		end
 	else
-		printf("Group " .. i .. " is empty")
+		--("Group " .. i .. " is empty")
 	end
 end
 
+MakeDir(basePath .. version)
 -- write file with missing Stats
 if #missingStatInfo > 0 then
 	local file = io.open(basePath .. version .. "/missingStats.txt", "w")
@@ -949,21 +1250,32 @@ if #missingStatInfo > 0 then
 	file:close()
 end
 
+-- Generating jewel slots
+printf("Generating jewel slots...")
+local jewelSlots = dat("passivejewelslots")
+for jewelSlot in jewelSlots:Rows() do
+	table.insert(tree.jewelSlots, jewelSlot.Passive.PassiveSkillNodeId)
+end
+
 -- updating skillsPerOrbit
-printf("Updating skillsPerOrbit...")
+--printf("Updating skillsPerOrbit...")
 for i, orbit in ipairs(orbitsConstants) do
 	-- only numbers base on 12
 	orbit = i == 1 and orbit or math.ceil(orbit / 12) * 12
 	tree.constants.skillsPerOrbit[i] = orbit
 end
 
+-- calculate the orbit radius
+for orbit, skillsInOrbit in ipairs(tree.constants.skillsPerOrbit) do
+	tree.constants.orbitAnglesByOrbit[orbit] = CalcOrbitAngles(skillsInOrbit)
+end
+
 -- Update position of ascendancy base on min / max 
 -- get the orbit radius + hard-coded value, calculate the angle of the class start
 -- translate the ascendancy to the new position in arc position
 local widthTree, heightTree = tree.max_x - tree.min_x, tree.max_y - tree.min_y
-local radiusTree = math.max(widthTree, heightTree) / 2
-local arcAngle = { [0] = 0, [1] = 0, [2] = 12, [3] = 24, [4] = 36, [5] = 48, [6] = 60}
-
+local radiusTree = (math.max(widthTree, heightTree) + 700) / 2
+local arcAngle = { [0] = 0, [1] = 0, [2] = 12, [3] = 24, [4] = 36, [5] = 48, [6] = 60, [7] = 72, [8] = 84, [9] = 96 }
 for i, classId in ipairs(psg.passives) do
 	local nodeStart = tree.nodes[classId]
 	local group = tree.groups[nodeStart.group]
@@ -985,21 +1297,44 @@ for i, classId in ipairs(psg.passives) do
 
 	local startAngle = angleToCenter - math.rad(arcAngle[total] / 2)
 	local angleStep = math.rad(arcAngle[total] / (total - 1)) or 0
-
 	local j = 1
 	for _, class in ipairs(classes) do
 		for _, ascendancy in ipairs(class.ascendancies) do
+			--printf("Positioning ascendancy " .. ascendancy.name .. " for class " .. class.name)
+			
+			local angle = startAngle + (j - 1) * angleStep
+			local cX = hardCoded * math.cos(angle)
+			local cY = hardCoded * math.sin(angle)
+
 			local info = ascendancyGroups[ascendancy.id]
+			if info == nil then
+				printf("Ascendancy group " .. ascendancy.id .. " not found")
+				goto continuepositioning
+			end
 			local ascendancyNode = tree.nodes[info.startId]
+			if ascendancyNode == nil then
+				printf("Ascendancy node " .. ascendancy.id .. " not found")
+				goto continuepositioning
+			end
+
+			ascendancy.background.x = cX
+			ascendancy.background.y = cY
+
 			local groupAscendancy = tree.groups[ascendancyNode.group]
 
-			local angle = startAngle + (j - 1) * angleStep
-			local newX = hardCoded * math.cos(angle)
-			local newY = hardCoded * math.sin(angle)
+			local innerRadious = dat("ascendancy"):GetRow("Id", ascendancy.internalId).distanceTree
+
+			local newInnerX = cX + math.cos(angleToCenter) * innerRadious
+			local newInnerY = cY + math.sin(angleToCenter) * innerRadious
+
+			local nodeAngle = tree.constants.orbitAnglesByOrbit[ascendancyNode.orbit + 1][ascendancyNode.orbitIndex + 1]
+			local orbitRadius = tree.constants.orbitRadii[ascendancyNode.orbit + 1]
+			local newX = newInnerX - math.sin(nodeAngle) * orbitRadius
+			local newY = newInnerY + math.cos(nodeAngle) * orbitRadius
 
 			local offsetX = newX - groupAscendancy.x
 			local offsetY = newY - groupAscendancy.y
-		
+
 			-- now update the whole groups with the offset
 			for groupId, value in pairs(info) do
 				if type(value) == "boolean" then
@@ -1014,16 +1349,50 @@ for i, classId in ipairs(psg.passives) do
 					tree.max_y = math.max(tree.max_y, group.y + hardCoded / 2)
 				end
 			end
+
 			j = j + 1
+			:: continuepositioning ::
 		end
 	end
 end
 
-MakeDir(basePath .. version)
+printf("Fixing replace ascendancies position...")
+for from, to in pairs(ascedancyReplacements) do
+	local fromAscendancy
+	local toAscendancy
+	for _, class in ipairs(tree.classes) do
+		for _, ascendancy in ipairs(class.ascendancies) do
+			if ascendancy.name == from then
+				fromAscendancy = ascendancy
+			end
+			if ascendancy.name == to then
+				toAscendancy = ascendancy
+			end
+		end
+	end
 
-printf("Generating sprite info...")
+	if fromAscendancy == nil then
+		printf("From ascendancy " .. from .. " not found")
+		goto continuereplace
+	end
+	if toAscendancy == nil then
+		printf("To ascendancy " .. to .. " not found")
+		goto continuereplace
+	end
+
+	fromAscendancy.replaceBy = to
+
+	toAscendancy.background.x = fromAscendancy.background.x
+	toAscendancy.background.y = fromAscendancy.background.y
+
+	:: continuereplace ::
+end
+
+
+--printf("Generating sprite info...")
+extractSheetFiles(sheets, use4kIfPossible, linesDds)
 for i, sheet in ipairs(sheets) do
-	printf("Calculating sprite dimensions for " .. sheet.name)
+	--printf("Calculating sprite dimensions for " .. sheet.name)
 	calculateDDSPack(sheet, main.ggpk.oozPath, basePath .. version .. "/", use4kIfPossible)
 
 	for file, fileInfo in pairs(sheet.ddsCoords) do
@@ -1031,48 +1400,7 @@ for i, sheet in ipairs(sheets) do
 	end
 end
 
-printf("Generating decompose lines images...")
-local linesFiles = {
-	{
-		file = "art/2dart/passivetree/passiveskillscreencurvesactivetogether.dds",
-		mask = "art/2dart/uieffects/passiveskillscreen/linestogethermask.dds",
-		extension = ".png",
-		basename = "orbit_active",
-		first = "LineConnector",
-		prefix = "Orbit",
-		postfix = "Active",
-		meta = 0.3835,
-		total = 10
-	},
-	{
-		file = "art/2dart/passivetree/passiveskillscreencurvesintermediatetogether.dds",
-		mask = "art/2dart/uieffects/passiveskillscreen/linestogethermask.dds",
-		extension = ".png",
-		basename = "orbit_intermediate",
-		first = "LineConnector",
-		prefix = "Orbit",
-		postfix = "Intermediate",
-		total = 10
-	},
-	{
-		file = "art/2dart/passivetree/passiveskillscreencurvesnormaltogether.dds",
-		mask = "art/2dart/uieffects/passiveskillscreen/linestogethermask.dds",
-		extension = ".png",
-		basename = "orbit_normal",
-		first = "LineConnector",
-		prefix = "Orbit",
-		postfix = "Normal",
-		total = 10
-	}
-}
-
-local linesDds = {}
-for _, lines in ipairs(linesFiles) do
-	table.insert(linesDds, lines.file)
-	table.insert(linesDds, lines.mask)
-end
-
-extractFromGgpk(linesDds)
+printf("Convert DDS line files to PNG...")
 nvtt.ExportDDSToPng(main.ggpk.oozPath, basePath .. version .. "/", "lines", linesDds, true)
 
 -- change extension from dds to png
@@ -1083,7 +1411,7 @@ end
 
 gimpBatch.extract_lines_from_image("lines_extract", linesFiles, main.ggpk.oozPath, basePath .. version .. "/", GetScriptPath() .. "/Tree/GimpBatch/extract_lines.scm", generateAssets)
 
-printf("generate lines info into assets")
+--printf("generate lines info into assets")
 -- Generate sprites
 for _, lines in ipairs(linesFiles) do
 	local curveOrbitFile = 9
@@ -1114,7 +1442,7 @@ for _, lines in ipairs(linesFiles) do
 	end
 end
 
-printf("Generating file in " .. fileTree)
+printf("Generating lua tree file")
 local out, err = io.open(fileTree, "w")
 if out == nil then
 	printf("Error opening file " .. fileTree)
@@ -1124,10 +1452,10 @@ end
 out:write('return ')
 writeLuaTable(out, tree, 1)
 out:close()
-printf("File " .. fileTree .. " generated")
+--("File " .. fileTree .. " generated")
 
 local fileTreeJson = fileTree:gsub(".lua", ".json")
-printf("Generating json file in " .. fileTreeJson)
+printf("Generating JSON tree file")
 local out, err = io.open(fileTreeJson, "w")
 if out == nil then
 	printf("Error opening file " .. fileTreeJson)
@@ -1136,4 +1464,5 @@ if out == nil then
 end
 out:write(json.encode(tree))
 out:close()
+printf("Skill tree generated")
 :: final ::

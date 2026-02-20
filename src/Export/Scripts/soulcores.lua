@@ -3,6 +3,13 @@ if not loadStatFile then
 end
 loadStatFile("stat_descriptions.csd")
 
+classMap = {
+	["Martial Weapons"] = { "weapon" },
+	["Armour"] = { "armour" },
+	["Caster Weapons"] = { "caster" },
+	["All"] = { "weapon", "armour", "caster" },
+}
+
 function table.containsId(table, element)
   for _, value in pairs(table) do
     if value.Id == element then
@@ -11,8 +18,6 @@ function table.containsId(table, element)
   end
   return false
 end
-
-local s_format = string.format
 
 local directiveTable = { }
 
@@ -35,39 +40,70 @@ directiveTable.base = function(state, args, out)
 	end
 	displayName = displayName:gsub("\195\182","o")
 	displayName = displayName:gsub("^%s*(.-)%s*$", "%1") -- trim spaces GGG might leave in by accident
-	
-	-- Special handling of Runes and SoulCores
-	local soulcore = dat("SoulCores"):GetRow("BaseItemTypes", baseItemType)
-	if soulcore then
-		local function writeStats(stats, out)
-			local stats, orders = describeStats(stats)
-			if #orders > 0 then
-				out:write('{ ')
-				out:write('type = "Rune", ')
-				out:write('"'..table.concat(stats, '", "'), '", ')
-				out:write('statOrder = { ', table.concat(orders, ', '), ' }, ')						
-				out:write('},\n')
+
+	local function writeModLines(modLines, out)
+		for _, modLine in ipairs(modLines) do
+			out:write('\t\t["'..modLine.slotType..'"] = {\n')
+			out:write('\t\t\t\ttype = "Rune",\n')
+			-- only write labels/statOrder if present
+			if modLine.label and #modLine.label > 0 then
+				out:write('\t\t\t\t"'..table.concat(modLine.label, '",\n\t\t\t\t"')..'",\n')
+				local statOrder = modLine.statOrder or {}
+				out:write('\t\t\t\tstatOrder = { '..table.concat(statOrder, ', ')..' },\n')
+			end
+			out:write('\t\t\t\trank = { '..(modLine.rank or 0)..' },\n')
+			out:write('\t\t},\n')
+		end
+	end
+
+	-- Check for Standard Weapon, Armour, Caster Runes
+	local soulCores = dat("SoulCores"):GetRow("BaseItemTypes", baseItemType)
+	local soulCoreStats = dat("SoulCoreStats"):GetRowList("Id", soulCores)
+	out:write('\t["', displayName, '"] = {\n')
+	local modLines = { }
+	local rank = 0
+	for _, soulCoreStat in ipairs(soulCoreStats) do
+		rank = soulCores.LevelReq or 0
+
+		local stats = { }
+		for i, statKey in ipairs(soulCoreStat.Stats) do
+			local statValue = soulCoreStat["StatValue"][i]
+			stats[statKey.Id] = { min = statValue, max = statValue }
+		end
+		local bondedStats = { }
+		for i, statKey in ipairs(soulCoreStat.BondedStats) do
+			local statValue = soulCoreStat["BondedValues"][i]
+			bondedStats[statKey.Id] = { min = statValue, max = statValue, bonded = true }
+		end
+		if next(stats) then
+			for _, class in ipairs(classMap[soulCoreStat.Category.Id] or { string.lower(soulCoreStat.Category.Id) }) do
+				local stats, orders = describeStats(stats)
+				local bondedStats, bondedOrders = describeStats(bondedStats)
+				for i, stat in ipairs(bondedStats) do
+					bondedStats[i] = "Bonded: " .. stat
+				end
+				for _, stat in ipairs(bondedStats) do
+					table.insert(stats, stat)
+				end
+				for _, order in ipairs(bondedOrders) do
+					table.insert(orders, order)
+				end
+				if #orders > 0 then
+					local out = {
+						type = "Rune",
+						slotType = class,
+						label = stats,
+						statOrder = orders,
+						rank = rank,
+					}
+					table.insert(modLines, out)
+				end
 			end
 		end
-		out:write('\t["', displayName, '"] = {\n')
-		-- weapons
-		local stats = { }
-		for i, statKey in ipairs(soulcore.StatsKeysWeapon) do
-			local statValue = soulcore["StatsValuesWeapon"][i]
-			stats[statKey.Id] = { min = statValue, max = statValue }
-		end
-		out:write("\t\tweapon = ")
-		writeStats(stats, out)
-		stats = { }  -- reset stats to empty
-		for i, statKey in ipairs(soulcore.StatsKeysArmour) do
-			local statValue = soulcore["StatsValuesArmour"][i]
-			stats[statKey.Id] = { min = statValue, max = statValue }
-		end
-		out:write("\t\tarmour = ")
-		writeStats(stats, out)
-
-		out:write('\t},\n')
 	end
+
+	writeModLines(modLines, out)
+	out:write('\t},\n')
 end
 
 directiveTable.baseMatch = function(state, argstr, out)
@@ -75,7 +111,7 @@ directiveTable.baseMatch = function(state, argstr, out)
 	local key = "Id"
 	local args = {}
 	for i in string.gmatch(argstr, "%S+") do
-	   table.insert(args, i)
+		table.insert(args, i)
 	end
 	local value = args[1]
 	-- If column name is specified, use that
@@ -106,3 +142,5 @@ end
 
 out:write("}")
 out:close()
+
+print("Soul Cores exported.")

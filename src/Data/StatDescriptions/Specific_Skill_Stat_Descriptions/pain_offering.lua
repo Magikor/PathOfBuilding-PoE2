@@ -9,19 +9,6 @@ return {
 	},
 	[2]={
 		[1]={
-			[1]={
-				[1]={
-					k="divide_by_ten_1dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Minion Aura radius {0}m"
-			}
 		},
 		stats={
 			[1]="active_skill_area_of_effect_radius"
@@ -38,9 +25,13 @@ return {
 					[1]={
 						[1]=10,
 						[2]=10
+					},
+					[2]={
+						[1]=0,
+						[2]=0
 					}
 				},
-				text="Minion Aura radius is {0} metre"
+				text="{0:+d} metre to Minion Aura radius"
 			},
 			[2]={
 				[1]={
@@ -51,13 +42,52 @@ return {
 					[1]={
 						[1]="#",
 						[2]="#"
+					},
+					[2]={
+						[1]=0,
+						[2]=0
+					}
+				},
+				text="{0:+d} metres to Minion Aura radius"
+			},
+			[3]={
+				[1]={
+					k="divide_by_ten_1dp_if_required",
+					v=1
+				},
+				limit={
+					[1]={
+						[1]=10,
+						[2]=10
+					},
+					[2]={
+						[1]="#",
+						[2]="#"
+					}
+				},
+				text="Minion Aura radius is {0} metre"
+			},
+			[4]={
+				[1]={
+					k="divide_by_ten_1dp_if_required",
+					v=1
+				},
+				limit={
+					[1]={
+						[1]="#",
+						[2]="#"
+					},
+					[2]={
+						[1]="#",
+						[2]="#"
 					}
 				},
 				text="Minion Aura radius is {0} metres"
 			}
 		},
 		stats={
-			[1]="active_skill_base_area_of_effect_radius"
+			[1]="active_skill_base_area_of_effect_radius",
+			[2]="quality_display_active_skill_base_area_of_effect_radius_is_gem"
 		}
 	},
 	[4]={
@@ -95,16 +125,14 @@ return {
 	},
 	[5]={
 		[1]={
+		},
+		stats={
+			[1]="minion_duration"
+		}
+	},
+	[6]={
+		[1]={
 			[1]={
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Minion increased Attack and Cast Speed granted {0}%"
-			},
-			[2]={
 				limit={
 					[1]={
 						[1]=1,
@@ -113,7 +141,7 @@ return {
 				},
 				text="Aura grants Minions {0}% increased Attack and Cast Speed"
 			},
-			[3]={
+			[2]={
 				[1]={
 					k="negate",
 					v=1
@@ -131,27 +159,18 @@ return {
 			[1]="pain_offering_attack_and_cast_speed_+%"
 		}
 	},
-	[6]={
+	[7]={
 		[1]={
 			[1]={
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Minion more damage granted {0}%"
-			},
-			[2]={
 				limit={
 					[1]={
 						[1]=1,
 						[2]="#"
 					}
 				},
-				text="Aura grants Minions {0}% more Damage"
+				text="Aura grants Minions {0}% increased damage"
 			},
-			[3]={
+			[2]={
 				[1]={
 					k="negate",
 					v=1
@@ -162,39 +181,20 @@ return {
 						[2]=-1
 					}
 				},
-				text="Aura grants Minions {0}% less Damage"
+				text="Aura grants Minions {0}% reduced damage"
 			}
 		},
 		stats={
-			[1]="pain_offering_damage_+%_final"
-		}
-	},
-	[7]={
-		[1]={
-			[1]={
-				[1]={
-					k="milliseconds_to_seconds_2dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Spike duration {0}s"
-			}
-		},
-		stats={
-			[1]="skill_effect_duration"
+			[1]="pain_offering_damage_+%"
 		}
 	},
 	["active_skill_area_of_effect_radius"]=2,
 	["active_skill_base_area_of_effect_radius"]=3,
 	["base_secondary_skill_effect_duration"]=1,
 	["base_skill_effect_duration"]=4,
-	["pain_offering_attack_and_cast_speed_+%"]=5,
-	["pain_offering_damage_+%_final"]=6,
+	["minion_duration"]=5,
+	["pain_offering_attack_and_cast_speed_+%"]=6,
+	["pain_offering_damage_+%"]=7,
 	parent="skill_stat_descriptions",
-	["skill_effect_duration"]=7
+	["quality_display_active_skill_base_area_of_effect_radius_is_gem"]=3
 }

@@ -7,28 +7,15 @@ return {
 			[1]={
 				limit={
 					[1]={
-						[1]=1,
+						[1]="#",
 						[2]="#"
 					}
 				},
-				text="Socketed Skills deal {0}% more Damage"
-			},
-			[2]={
-				[1]={
-					k="negate",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]=-1
-					}
-				},
-				text="Socketed Skills deal {0}% less Damage"
+				text="Triggers Socketed Warcry instead of Ferocious Roar's effects"
 			}
 		},
 		stats={
-			[1]="support_totem_damage_+%_final"
+			[1]="display_bear_warcry"
 		}
 	},
 	[2]={
@@ -57,7 +44,7 @@ return {
 			}
 		},
 		stats={
-			[1]="support_additional_totem_damage_+%_final"
+			[1]="support_totem_damage_+%_final"
 		}
 	},
 	[3]={
@@ -69,7 +56,7 @@ return {
 						[2]="#"
 					}
 				},
-				text="{0}% more Effect of Socketed Curses"
+				text="Socketed Skills deal {0}% more Damage"
 			},
 			[2]={
 				[1]={
@@ -82,11 +69,11 @@ return {
 						[2]=-1
 					}
 				},
-				text="{0}% less Effect of Socketed Curses"
+				text="Socketed Skills deal {0}% less Damage"
 			}
 		},
 		stats={
-			[1]="support_blasphemy_curse_effect_+%_final"
+			[1]="support_additional_totem_damage_+%_final"
 		}
 	},
 	[4]={
@@ -98,7 +85,7 @@ return {
 						[2]="#"
 					}
 				},
-				text="Sockted Spells have {0}% more Cast Speed"
+				text="Supported Curses have {0}% more Magnitudes"
 			},
 			[2]={
 				[1]={
@@ -111,14 +98,43 @@ return {
 						[2]=-1
 					}
 				},
-				text="Socketed Spells have {0}% less Cast Speed"
+				text="Supported Curses have {0}% less Magnitudes"
+			}
+		},
+		stats={
+			[1]="support_blasphemy_curse_effect_+%_final"
+		}
+	},
+	[5]={
+		[1]={
+			[1]={
+				limit={
+					[1]={
+						[1]=1,
+						[2]="#"
+					}
+				},
+				text="Sockted Skills have {0}% more Cast Speed"
+			},
+			[2]={
+				[1]={
+					k="negate",
+					v=1
+				},
+				limit={
+					[1]={
+						[1]="#",
+						[2]=-1
+					}
+				},
+				text="Socketed Skills have {0}% less Cast Speed"
 			}
 		},
 		stats={
 			[1]="support_spell_totem_cast_speed_+%_final"
 		}
 	},
-	[5]={
+	[6]={
 		[1]={
 			[1]={
 				limit={
@@ -147,7 +163,7 @@ return {
 			[1]="support_attack_totem_attack_speed_+%_final"
 		}
 	},
-	[6]={
+	[7]={
 		[1]={
 			[1]={
 				limit={
@@ -163,7 +179,7 @@ return {
 			[1]="disable_skill_if_melee_attack"
 		}
 	},
-	[7]={
+	[8]={
 		[1]={
 			[1]={
 				[1]={
@@ -174,16 +190,60 @@ return {
 					[1]={
 						[1]=1,
 						[2]="#"
+					},
+					[2]={
+						[1]="#",
+						[2]="#"
 					}
 				},
 				text="Socketed Skills have {0:+d} metres to base radius"
 			}
 		},
 		stats={
-			[1]="active_skill_base_area_of_effect_radius"
+			[1]="active_skill_base_area_of_effect_radius",
+			[2]="quality_display_active_skill_base_area_of_effect_radius_is_gem"
 		}
 	},
-	[8]={
+	[9]={
+		[1]={
+			[1]={
+				["gem_quality"]=true,
+				limit={
+					[1]={
+						[1]=1,
+						[2]="#"
+					}
+				},
+				text="{0:+d}% increased duration of socketed Curses"
+			},
+			[2]={
+				limit={
+					[1]={
+						[1]=1,
+						[2]="#"
+					}
+				},
+				text="{0}% increased duration of socketed Curses"
+			},
+			[3]={
+				[1]={
+					k="negate",
+					v=1
+				},
+				limit={
+					[1]={
+						[1]="#",
+						[2]=-1
+					}
+				},
+				text="{0}% reduced duration of socketed Curses"
+			}
+		},
+		stats={
+			[1]="base_curse_duration_+%"
+		}
+	},
+	[10]={
 		[1]={
 			[1]={
 				limit={
@@ -212,18 +272,28 @@ return {
 			[1]="base_skill_area_of_effect_+%"
 		}
 	},
-	[9]={
+	[11]={
 		[1]={
 			[1]={
+				["gem_quality"]=true,
+				limit={
+					[1]={
+						[1]="#",
+						[2]="#"
+					}
+				},
+				text="Supported Curses have {0}% increased Magnitudes"
+			},
+			[2]={
 				limit={
 					[1]={
 						[1]=1,
 						[2]="#"
 					}
 				},
-				text="{0}% increased Effect of Socketed Curses"
+				text="Supported Curses have {0}% increased Magnitudes"
 			},
-			[2]={
+			[3]={
 				[1]={
 					k="negate",
 					v=1
@@ -234,14 +304,14 @@ return {
 						[2]=-1
 					}
 				},
-				text="{0}% reduced Effect of Socketed Curses"
+				text="Supported Curses have {0}% reduced Magnitudes"
 			}
 		},
 		stats={
 			[1]="curse_effect_+%"
 		}
 	},
-	[10]={
+	[12]={
 		[1]={
 			[1]={
 				limit={
@@ -250,7 +320,7 @@ return {
 						[2]="#"
 					}
 				},
-				text="Socketed Skills deal {0}% increased Damage"
+				text="Socketed Skills deal {0}% increased damage"
 			},
 			[2]={
 				[1]={
@@ -263,14 +333,34 @@ return {
 						[2]=-1
 					}
 				},
-				text="Socketed Skills deal {0}% reduced Damage"
+				text="Socketed Skills deal {0}% reduced damage"
 			}
 		},
 		stats={
 			[1]="damage_+%"
 		}
 	},
-	[11]={
+	[13]={
+		[1]={
+			[1]={
+				[1]={
+					k="divide_by_one_hundred_2dp_if_required",
+					v=1
+				},
+				limit={
+					[1]={
+						[1]="#",
+						[2]="#"
+					}
+				},
+				text="Socketed Attacks consume 10 Energy per {0} seconds of Base Skill Attack Time to create a visage"
+			}
+		},
+		stats={
+			[1]="feral_invocation_energy_cost_per_X_ms_of_base_attack_time"
+		}
+	},
+	[14]={
 		[1]={
 			[1]={
 				[1]={
@@ -312,9 +402,19 @@ return {
 			[2]="generic_ongoing_trigger_triggers_at_maximum_energy"
 		}
 	},
-	[12]={
+	[15]={
 		[1]={
 			[1]={
+				["gem_quality"]=true,
+				limit={
+					[1]={
+						[1]="#",
+						[2]="#"
+					}
+				},
+				text="{0:+d}% increased Effect of Socketed Marks"
+			},
+			[2]={
 				limit={
 					[1]={
 						[1]=1,
@@ -323,7 +423,7 @@ return {
 				},
 				text="{0}% increased Effect of Socketed Marks"
 			},
-			[2]={
+			[3]={
 				[1]={
 					k="negate",
 					v=1
@@ -341,7 +441,7 @@ return {
 			[1]="mark_effect_+%"
 		}
 	},
-	[13]={
+	[16]={
 		[1]={
 			[1]={
 				limit={
@@ -370,7 +470,7 @@ return {
 			[1]="trigger_meta_gem_damage_+%_final"
 		}
 	},
-	[14]={
+	[17]={
 		[1]={
 			[1]={
 				limit={
@@ -399,7 +499,7 @@ return {
 			[1]="warcry_buff_effect_+%"
 		}
 	},
-	[15]={
+	[18]={
 		[1]={
 			[1]={
 				limit={
@@ -433,7 +533,7 @@ return {
 			[2]="skill_empower_limitation_specifier_for_stat_description"
 		}
 	},
-	[16]={
+	[19]={
 		[1]={
 			[1]={
 				limit={
@@ -442,30 +542,34 @@ return {
 						[2]="#"
 					}
 				},
-				text="Attacks Exerted by Socketed Skills deal {0}% increased Damage"
+				text="Attacks Empowered by Socketed\nSkills deal {0}% increased damage"
 			}
 		},
 		stats={
 			[1]="warcry_grant_damage_+%_to_exerted_attacks"
 		}
 	},
-	["active_skill_base_area_of_effect_radius"]=7,
-	["base_skill_area_of_effect_+%"]=8,
-	["curse_effect_+%"]=9,
-	["damage_+%"]=10,
-	["disable_skill_if_melee_attack"]=6,
-	["generic_ongoing_trigger_1_maximum_energy_per_Xms_total_cast_time"]=11,
-	["generic_ongoing_trigger_triggers_at_maximum_energy"]=11,
-	["mark_effect_+%"]=12,
+	["active_skill_base_area_of_effect_radius"]=8,
+	["base_curse_duration_+%"]=9,
+	["base_skill_area_of_effect_+%"]=10,
+	["curse_effect_+%"]=11,
+	["damage_+%"]=12,
+	["disable_skill_if_melee_attack"]=7,
+	["display_bear_warcry"]=1,
+	["feral_invocation_energy_cost_per_X_ms_of_base_attack_time"]=13,
+	["generic_ongoing_trigger_1_maximum_energy_per_Xms_total_cast_time"]=14,
+	["generic_ongoing_trigger_triggers_at_maximum_energy"]=14,
+	["mark_effect_+%"]=15,
 	parent="gem_stat_descriptions",
-	["skill_empower_limitation_specifier_for_stat_description"]=15,
-	["skill_empowers_next_x_melee_attacks"]=15,
-	["support_additional_totem_damage_+%_final"]=2,
-	["support_attack_totem_attack_speed_+%_final"]=5,
-	["support_blasphemy_curse_effect_+%_final"]=3,
-	["support_spell_totem_cast_speed_+%_final"]=4,
-	["support_totem_damage_+%_final"]=1,
-	["trigger_meta_gem_damage_+%_final"]=13,
-	["warcry_buff_effect_+%"]=14,
-	["warcry_grant_damage_+%_to_exerted_attacks"]=16
+	["quality_display_active_skill_base_area_of_effect_radius_is_gem"]=8,
+	["skill_empower_limitation_specifier_for_stat_description"]=18,
+	["skill_empowers_next_x_melee_attacks"]=18,
+	["support_additional_totem_damage_+%_final"]=3,
+	["support_attack_totem_attack_speed_+%_final"]=6,
+	["support_blasphemy_curse_effect_+%_final"]=4,
+	["support_spell_totem_cast_speed_+%_final"]=5,
+	["support_totem_damage_+%_final"]=2,
+	["trigger_meta_gem_damage_+%_final"]=16,
+	["warcry_buff_effect_+%"]=17,
+	["warcry_grant_damage_+%_to_exerted_attacks"]=19
 }

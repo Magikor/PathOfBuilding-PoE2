@@ -4,24 +4,11 @@
 return {
 	[1]={
 		stats={
-			[1]="tempest_bell_hit_limit"
+			[1]="bell_hit_limit"
 		}
 	},
 	[2]={
 		[1]={
-			[1]={
-				[1]={
-					k="divide_by_ten_1dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Impact radius {0}m"
-			}
 		},
 		stats={
 			[1]="active_skill_area_of_effect_radius"
@@ -62,6 +49,6 @@ return {
 	},
 	["active_skill_area_of_effect_radius"]=2,
 	["active_skill_base_area_of_effect_radius"]=3,
-	parent="specific_skill_stat_descriptions/tempest_bell_statset_0",
-	["tempest_bell_hit_limit"]=1
+	["bell_hit_limit"]=1,
+	parent="specific_skill_stat_descriptions/tempest_bell_statset_0"
 }

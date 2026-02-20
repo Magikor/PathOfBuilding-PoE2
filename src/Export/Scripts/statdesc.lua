@@ -12,7 +12,7 @@ local function processStatFile(name, changeOutLocation)
 			line = prepend .. line
 			prepend = ''
 		end
-		local parent = line:match('include "Metadata/StatDescriptions/(.+)%.csd"$')
+		local parent = line:match('include "Data/StatDescriptions/(.+)%.csd"$')
 		if parent then
 			statDescriptor.parent = parent:gsub("\\", "/"):gsub("/statset", "_statset")
 			return
@@ -42,18 +42,10 @@ local function processStatFile(name, changeOutLocation)
 			if langName then
 				curLang = nil--{ }
 				--curDescriptor.lang[langName] = curLang
-			elseif curLang then
-				local table_only = false
-				if line:match('table_only') then
-					line = line:gsub('table_only ', '')
-					table_only = true
-				end
-				local statLimits, text, special = line:match('([%d%-#!| ]+)%s*"(.-)"%s*(.*)')
+			elseif curLang and not line:match('table_only') then
+				local statLimits, quality, text, special = line:match('([%d%-#| !]+)%s*([%w_]*)%s*"(.-)"%s*(.*)')
 				if statLimits then
-					if text and table_only then
-						text = text:gsub('@', ' ')
-					end
-					local desc = { text = escapeGGGString(text):gsub("\\([^nb])", "\\n%1"), limit = { } }
+					local desc = { text = sanitiseText(escapeGGGString(text)):gsub("\\([^nb])", "\\n%1"), limit = { } }
 					for statLimit in statLimits:gmatch("[!%d%-#|]+") do
 						local limit = { }
 						
@@ -90,13 +82,17 @@ local function processStatFile(name, changeOutLocation)
 						})
 						nk["canonical_line"] = true
 					end
+					if quality:match("gem_quality") then
+						desc[quality] = true
+						nk["gem_quality"] = true
+					end
 					table.insert(curLang, desc)
 				end
 			end
 		end
 	end
 
-	local text = convertUTF16to8(getFile("Metadata/StatDescriptions/"..name..".csd"))
+	local text = convertUTF16to8(getFile("Data/StatDescriptions/"..name..".csd"))
 	for line in text:gmatch("[^\r\n]+") do
 		processLine(line)
 	end
@@ -128,7 +124,7 @@ for _, name in ipairs(statFileList) do
 	processStatFile(name)
 end
 
-local handle = NewFileSearch("ggpk/Metadata/StatDescriptions/Specific_Skill_Stat_Descriptions/*.csd")
+local handle = NewFileSearch("ggpk/Data/StatDescriptions/Specific_Skill_Stat_Descriptions/*.csd")
 while handle do
 	processStatFile("specific_skill_stat_descriptions/"..handle:GetFileName():gsub("%.csd", ""))
 	if not handle:NextFile() then
@@ -136,34 +132,21 @@ while handle do
 	end
 end
 
-local specificSkillDirectoryList = {
-	"blazing_cluster",
-	"bone_spike",
-	"channel_stampede",
-	"channelled_slam",
-	"corpse_cloud",
-	"earthquake",
-	"gas_cloud_arrow",
-	"gathering_storm",
-	"herald_of_thunder",
-	"ice_ambush",
-	"incinerate_player",
-	"lightning_arrow",
-	"magnetic_salvo",
-	"molten_blast",
-	"new_sunder",
-	"poison_vine_arrow",
-	"siege_cascade_stormblast",
-	"sniper_gas_shot",
-	"solar_orb",
-	"spike_slam",
-	"tempest_bell",
-	"tornado_shot",
-	"toxic_grenade",
-}
+-- Lua implementation of PHP scandir function. Scans for folders
+function scandir(directory)
+    local i, t, popen = 0, {}, io.popen
+    local pfile = popen('dir "'..directory..'" /b /ad')
+    for filename in pfile:lines() do
+        i = i + 1
+        t[i] = filename
+    end
+    pfile:close()
+    return t
+end
+local skillSpecificFolders = scandir(main.ggpk.oozPath.."Data/StatDescriptions/Specific_Skill_Stat_Descriptions")
 
-for _, name in ipairs(specificSkillDirectoryList) do
-	local handle = NewFileSearch("ggpk/Metadata/StatDescriptions/Specific_Skill_Stat_Descriptions/"..name.."/*.csd")
+for _, name in ipairs(skillSpecificFolders) do
+	local handle = NewFileSearch("ggpk/Data/StatDescriptions/Specific_Skill_Stat_Descriptions/"..name.."/*.csd")
 	while handle do
 		processStatFile("specific_skill_stat_descriptions/"..name.."/"..handle:GetFileName():gsub("%.csd", ""), true)
 		if not handle:NextFile() then

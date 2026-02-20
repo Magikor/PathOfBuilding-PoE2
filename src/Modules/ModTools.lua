@@ -184,7 +184,20 @@ function modLib.formatValue(value)
 			t_insert(paramNames, name)
 		end
 	end
-	t_sort(paramNames)
+
+	t_sort(paramNames, function (a, b)
+		if type(a) == "number" and type(b) == "number" then
+			return a < b
+		end
+		if type(a) == "number" then
+			return true
+		end
+		if type(b) == "number" then
+			return false
+		end
+		return a < b
+	end)
+
 	if haveType then
 		t_insert(paramNames, 1, "type")
 	end
@@ -220,4 +233,36 @@ function modLib.setSource(mod, source)
 		mod.value.mod.source = source
 	end
 	return mod
+end
+
+-- Check if a mod contains a specific tag already
+-- Note: All keys AND values need to be matched exactly
+---@param mod table individual mod that is to be checked
+---@param searchTag table exact tag you're searching for, e.g.  { type = "Condition", var = "Shocked" }
+---@return boolean @returns `true` if tag is found, otherwise `false`
+---@return number @returns position as `number` if tag exists or `0` if not 
+function modLib.hasTag(mod, searchTag)
+	local numSearchKeys = 0 -- Apparently Lua doesn't have a built in functionality to return the number of keys in a table(?) so have to determine manually
+	for _, __ in pairs(searchTag) do
+		numSearchKeys = numSearchKeys + 1
+	end
+
+	for i, tag in ipairs(mod) do
+		local numTagKeys = 0 -- Total number of keys in tag
+		local numMatchedKeys = 0 -- Number of keys matching with searchTag
+		if type(tag) == "table" then
+			for key, value in pairs(searchTag) do
+				numTagKeys = numTagKeys + 1
+				if tag[key] and (tag[key] == value) then
+					numMatchedKeys = numMatchedKeys + 1
+				else
+					break -- this is not the correct tag
+				end
+			end
+		end
+		if (numSearchKeys > 0) and (numSearchKeys == numMatchedKeys) and (numSearchKeys == numTagKeys) then
+			return true, i
+		end
+	end
+	return false, 0
 end

@@ -15,24 +15,11 @@ return {
 						[2]="#"
 					}
 				},
-				text="Physical Attack Life Leech granted per Rage {0}%"
-			},
-			[2]={
-				[1]={
-					k="divide_by_one_hundred_2dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
 				text="Grants {0}% of Physical Attack Leeched as Life per Rage"
 			}
 		},
 		stats={
-			[1]="life_leech_from_physical_attack_damage_permyriad_per_rage"
+			[1]="skill_base_life_leech_from_physical_attack_damage_permyriad_per_rage_to_apply"
 		}
 	},
 	[2]={
@@ -48,38 +35,16 @@ return {
 						[2]="#"
 					}
 				},
-				text="Life Lost per Rage while not losing Rage {0}%"
-			},
-			[2]={
-				[1]={
-					k="per_minute_to_per_second_2dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Lose {0}% of Life per Rage per second while not losing Rage"
+				text="Lose {0}% of maximum Life per Rage per second while not losing Rage"
 			}
 		},
 		stats={
-			[1]="life_loss_%_per_minute_per_rage_while_not_losing_rage"
+			[1]="skill_base_life_loss_%_per_minute_per_rage_while_not_losing_rage_to_apply"
 		}
 	},
 	[3]={
 		[1]={
 			[1]={
-				limit={
-					[1]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Rage effect modifier {0}%"
-			},
-			[2]={
 				limit={
 					[1]={
 						[1]=1,
@@ -88,7 +53,7 @@ return {
 				},
 				text="Grants {0}% increased Rage effect"
 			},
-			[3]={
+			[2]={
 				[1]={
 					k="negate",
 					v=1
@@ -103,11 +68,11 @@ return {
 			}
 		},
 		stats={
-			[1]="rage_effect_+%"
+			[1]="skill_base_rage_effect_+%_to_apply"
 		}
 	},
-	["life_leech_from_physical_attack_damage_permyriad_per_rage"]=1,
-	["life_loss_%_per_minute_per_rage_while_not_losing_rage"]=2,
 	parent="skill_stat_descriptions",
-	["rage_effect_+%"]=3
+	["skill_base_life_leech_from_physical_attack_damage_permyriad_per_rage_to_apply"]=1,
+	["skill_base_life_loss_%_per_minute_per_rage_while_not_losing_rage_to_apply"]=2,
+	["skill_base_rage_effect_+%_to_apply"]=3
 }

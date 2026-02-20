@@ -90,26 +90,26 @@ directiveTable.base = function(state, args, out)
 	end
 	displayName = displayName:gsub("\195\182","o")
 	displayName = displayName:gsub("^%s*(.-)%s*$", "%1") -- trim spaces GGG might leave in by accident
-	displayName = displayName ~= "Energy Blade" and displayName or (state.type == "One Handed Sword" and "Energy Blade One Handed" or "Energy Blade Two Handed")
+	displayName = displayName ~= "Energy Blade" and displayName or (state.type == "One Hand Sword" and "Energy Blade One Handed" or "Energy Blade Two Handed")
+	if displayName:find("DNT") then
+		return
+	end
 	out:write('itemBases["', displayName, '"] = {\n')
 	out:write('\ttype = "', state.type, '",\n')
 	if state.subType and #state.subType > 0 then
 		out:write('\tsubType = "', state.subType, '",\n')
 	end
-	if maximumQuality ~= 0 then
+	if maximumQuality ~= 0 then --If it crashes on this line, you are missing a .It file for a base ConPrintf(baseItemType.BaseType)
 		out:write('\tquality = ', maximumQuality, ',\n')
 	end
 	if state.type == "Belt" then
-		local beltType = dat("BeltTypes"):GetRow("BaseItemType", baseItemType)
-		if beltType then
-			out:write('\tcharmLimit = ', beltType.CharmCount, ',\n')
-		end
+			out:write('\tcharmLimit = 0,\n')
 	end
 	local itemSpirit = dat("ItemSpirit"):GetRow("BaseItemType", baseItemType)
 	if itemSpirit then
 		out:write('\tspirit = ', itemSpirit.Value, ',\n')
 	end
-	if (baseItemType.Hidden == 0 or state.forceHide) and not baseTypeId:match("Talisman") and not state.forceShow then
+	if state.forceHide and not baseTypeId:match("Talisman") and not state.forceShow then
 		out:write('\thidden = true,\n')
 	end
 	if state.socketLimit then
@@ -118,12 +118,17 @@ directiveTable.base = function(state, args, out)
 	out:write('\ttags = { ')
 	local combinedTags = { }
 	for _, tag in ipairs(baseItemTags or {}) do
-		combinedTags[tag] = tag
+		combinedTags[tag] = true
 	end
 	for _, tag in ipairs(baseItemType.Tags) do
-		combinedTags[tag.Id] = tag.Id
+		combinedTags[tag.Id] = true
 	end
-	for _, tag in pairs(combinedTags) do
+	local combinedTagList = { }
+	for tag in pairsSortByKey(combinedTags) do
+		table.insert(combinedTagList, tag)
+	end
+	table.sort(combinedTagList)
+	for _, tag in ipairs(combinedTagList) do
 		out:write(tag, ' = true, ')
 	end
 	out:write('},\n')
@@ -135,17 +140,24 @@ directiveTable.base = function(state, args, out)
 			table.insert(implicitLines, line)
 			table.insert(implicitModTypes, modDesc.modTags)
 		end
+		if mod.Id == "SpearImplicitDisplaySpearThrow1" then
+			table.insert(implicitLines, "Grants Skill: Spear Throw")
+		end
+	end
+	if state.type == "Belt" then
+		table.insert(implicitLines, "Has (1-3) Charm Slots")
 	end
 	if #implicitLines > 0 then
 		out:write('\timplicit = "', table.concat(implicitLines, "\\n"), '",\n')
 	end
 	local inherentSkillType = dat("ItemInherentSkills"):GetRow("BaseItemType", baseItemType)
 	if inherentSkillType then
-		local skillGem = dat("SkillGems"):GetRow("BaseItemType", inherentSkillType.Skill)
+		local skillGem = dat("SkillGems"):GetRow("BaseItemType", inherentSkillType.Skill[1].BaseItemType)
+		local gemEffect = dat("GemEffects"):GetRow("GrantedEffect", skillGem.GemEffects[1].GrantedEffect)
 		if #inherentSkillType.Skill > 1 then
 			print("Unhandled Instance - Inherent Skill number more than 1")
 		end
-		out:write('\timplicit = "Grants Skill: Level (1-20) ', inherentSkillType.Skill[1].BaseItemType.Name, '",\n')
+		out:write('\timplicit = "Grants Skill: Level (1-20) ', gemEffect.GrantedEffect.ActiveSkill.DisplayName, '",\n')
 	end
 	out:write('\timplicitModTypes = { ')
 	for i=1,#implicitModTypes do
@@ -162,8 +174,34 @@ directiveTable.base = function(state, args, out)
 			["local_weapon_implicit_hidden_%_base_damage_is_lightning"] = "Lightning",
 			["local_weapon_implicit_hidden_%_base_damage_is_chaos"] = "Chaos",
 		}
+		local modAddedMinMap = {
+			["local_weapon_implicit_hidden_added_minimum_fire_damage"] = "Fire",
+			["local_weapon_implicit_hidden_added_minimum_cold_damage"] = "Cold",
+			["local_weapon_implicit_hidden_added_minimum_lightning_damage"] = "Lightning",
+			["local_weapon_implicit_hidden_added_minimum_chaos_damage"] = "Chaos",
+		}
+		local modAddedMaxMap = {
+			["local_weapon_implicit_hidden_added_maximum_fire_damage"] = "Fire",
+			["local_weapon_implicit_hidden_added_maximum_cold_damage"] = "Cold",
+			["local_weapon_implicit_hidden_added_maximum_lightning_damage"] = "Lightning",
+			["local_weapon_implicit_hidden_added_maximum_chaos_damage"] = "Chaos",
+		}
 		local conversion = {
 			["Physical"] = 100,
+			["Fire"] = 0,
+			["Cold"] = 0,
+			["Lightning"] = 0,
+			["Chaos"] = 0,
+		}
+		local addedMin = {
+			["Physical"] = 0,
+			["Fire"] = 0,
+			["Cold"] = 0,
+			["Lightning"] = 0,
+			["Chaos"] = 0,
+		}
+		local addedMax = {
+			["Physical"] = 0,
 			["Fire"] = 0,
 			["Cold"] = 0,
 			["Lightning"] = 0,
@@ -179,6 +217,16 @@ directiveTable.base = function(state, args, out)
 						conversion[dmgType] = conversion[dmgType] + value
 						total = total + value
 					end
+					local addedMinDamage = modAddedMinMap[mod["Stat"..i].Id]
+					if addedMinDamage then
+						local value = mod["Stat"..i.."Value"][1]
+						addedMin[addedMinDamage] = addedMin[addedMinDamage] + value
+					end
+					local addedMaxDamage = modAddedMaxMap[mod["Stat"..i].Id]
+					if addedMaxDamage then
+						local value = mod["Stat"..i.."Value"][1]
+						addedMax[addedMaxDamage] = addedMax[addedMaxDamage] + value
+					end
 				end
 			end
 		end
@@ -192,10 +240,19 @@ directiveTable.base = function(state, args, out)
 			if conversion[type] ~= 0 then
 				out:write(type, 'Min = ', math.floor(weaponType.DamageMin * conversion[type]), ', ', type, 'Max = ', math.floor(weaponType.DamageMax * conversion[type]), ', ')
 			end
+			if addedMin[type] ~= 0 then
+				out:write(type, 'Min = ', addedMin[type], ', ')
+			end
+			if addedMax[type] ~= 0 then
+				out:write(type,'Max = ', addedMax[type], ', ')
+			end
 		end
 		out:write('CritChanceBase = ', weaponType.CritChance / 100, ', ')
 		out:write('AttackRateBase = ', round(1000 / weaponType.Speed, 2), ', ')
 		out:write('Range = ', weaponType.Range, ', ')
+		if weaponType.ReloadTime > 0 then
+			out:write('ReloadTimeBase = ', round(weaponType.ReloadTime / 1000, 2), ', ')
+		end
 		out:write('},\n')
 		itemValueSum = weaponType.DamageMin + weaponType.DamageMax
 	end
@@ -256,26 +313,6 @@ directiveTable.base = function(state, args, out)
 			out:write('},\n')
 		end
 	end
-	-- Special handling of Runes and SoulCores
-	if state.type == "Rune" or state.type == "SoulCore" then
-		local soulcore = dat("SoulCores"):GetRow("BaseItemTypes", baseItemType)
-		if soulcore then
-			out:write('\timplicit = ')
-			local stats = { }
-			for i, statKey in ipairs(soulcore.StatsKeysWeapon) do
-				local statValue = soulcore["StatsValuesWeapon"][i]
-				stats[statKey.Id] = { min = statValue, max = statValue }
-			end
-			out:write('"Martial Weapons: ', table.concat(describeStats(stats), '", "'), '\\n')
-			stats = { }  -- reset stats to empty
-			for i, statKey in ipairs(soulcore.StatsKeysArmour) do
-				local statValue = soulcore["StatsValuesArmour"][i]
-				stats[statKey.Id] = { min = statValue, max = statValue }
-			end
-			out:write('Armour: ', table.concat(describeStats(stats), '", "'), '"')
-			out:write(',\n')
-		end
-	end
 	out:write('\treq = { ')
 	local reqLevel = 1
 	if weaponType or armourType then
@@ -308,7 +345,7 @@ directiveTable.base = function(state, args, out)
 	end
 	out:write('},\n}\n')
 	
-	if not ((baseItemType.Hidden == 0 or state.forceHide) and not baseTypeId:match("Talisman") and not state.forceShow) then
+	if not (state.forceHide and not baseTypeId:match("Talisman") and not state.forceShow) then
 		bases[state.type] = bases[state.type] or {}
 		local subtype = state.subType and #state.subType and state.subType or ""
 		if not bases[state.type][subtype] or itemValueSum > bases[state.type][subtype][2] then
@@ -381,8 +418,8 @@ directiveTable.setBase = function(state, args, out)
 	local baseClass, baseSubType = unpack(bases["All"][baseName])
 	local groupName = baseClass
 	if itemName then
-		out:write(s_format(itemName, baseClass):gsub("One Handed", "1H"):gsub("Two Handed", "2H"),'\n')
-		groupName = s_format(itemName, (baseClass:match("One Handed") or baseClass:match("Claw") or baseClass:match("Dagger") or baseClass:match("Sceptre") or baseClass:match("Wand")) and "One Handed" or (baseClass:match("Two Handed") or baseClass:match("Staff")) and "Two Handed" or "")
+		out:write(s_format(itemName, baseClass):gsub("One Hand", "1H"):gsub("Two Hand", "2H"),'\n')
+		groupName = s_format(itemName, (baseClass:match("One Hand") or baseClass:match("Claw") or baseClass:match("Dagger") or baseClass:match("Sceptre") or baseClass:match("Wand")) and "One Hand" or (baseClass:match("Two Hand") or baseClass:match("Staff")) and "Two Hand" or "")
 	else
 		if baseSubType then
 			groupName = baseSubType..' '..baseClass
@@ -434,7 +471,8 @@ local itemTypes = {
 	"belt",
 	"jewel",
 	"flask",
-	"soulcore",
+	"talisman",
+	"incursionlimb",
 }
 for _, name in pairs(itemTypes) do
 	processTemplateFile(name, "Bases/", "../Data/Bases/", directiveTable)
@@ -442,5 +480,5 @@ end
 
 print("Item bases exported.")
 
---processTemplateFile("Rares", "Bases/", "../Data/", directiveTable)
---print("Rare Item Templates Generated and Verified")
+processTemplateFile("Rares", "Bases/", "../Data/", directiveTable)
+print("Rare Item Templates Generated and Verified")

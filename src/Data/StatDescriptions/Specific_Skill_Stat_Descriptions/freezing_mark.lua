@@ -10,54 +10,68 @@ return {
 	[2]={
 		[1]={
 			[1]={
+				limit={
+					[1]={
+						[1]=1,
+						[2]="#"
+					},
+					[2]={
+						[1]=0,
+						[2]=0
+					}
+				},
+				text="Hits against Marked enemy cause {0:+d}% more Freeze buildup"
+			},
+			[2]={
+				limit={
+					[1]={
+						[1]=1,
+						[2]="#"
+					},
+					[2]={
+						[1]="#",
+						[2]="#"
+					}
+				},
+				text="Hits against Marked enemy cause {0}% more Freeze buildup"
+			},
+			[3]={
 				[1]={
-					k="divide_by_ten_1dp_if_required",
+					k="negate",
 					v=1
 				},
 				limit={
 					[1]={
 						[1]="#",
+						[2]=-1
+					},
+					[2]={
+						[1]="#",
 						[2]="#"
 					}
 				},
-				text="Explosion radius {0}m"
+				text="Hits against Marked enemy cause {0}% less Freeze buildup"
 			}
 		},
 		stats={
-			[1]="active_skill_area_of_effect_radius"
+			[1]="freezing_mark_hit_damage_freeze_multiplier_+%_final",
+			[2]="quality_display_freezing_mark_is_gem"
 		}
 	},
 	[3]={
 		[1]={
 			[1]={
-				[1]={
-					k="divide_by_ten_1dp_if_required",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]=10,
-						[2]=10
-					}
-				},
-				text="Explosion radius is {0} metre"
-			},
-			[2]={
-				[1]={
-					k="divide_by_ten_1dp_if_required",
-					v=1
-				},
 				limit={
 					[1]={
 						[1]="#",
 						[2]="#"
 					}
 				},
-				text="Explosion radius is {0} metres"
+				text="Marked enemy becomes Frozen when\nHit while Primed for Freeze"
 			}
 		},
 		stats={
-			[1]="active_skill_base_area_of_effect_radius"
+			[1]="active_skill_show_freeze_range_from_freezing_mark"
 		}
 	},
 	[4]={
@@ -98,68 +112,47 @@ return {
 			[1]={
 				limit={
 					[1]={
-						[1]="#",
-						[2]="#"
-					},
-					[2]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Marked enemy more Freeze buildup {0}%"
-			},
-			[2]={
-				limit={
-					[1]={
 						[1]=1,
 						[2]="#"
-					},
-					[2]={
-						[1]="#",
-						[2]="#"
 					}
 				},
-				text="Hits against Marked enemy cause {0}% more Freeze buildup"
-			},
-			[3]={
-				[1]={
-					k="negate",
-					v=1
-				},
-				limit={
-					[1]={
-						[1]="#",
-						[2]=-1
-					},
-					[2]={
-						[1]="#",
-						[2]="#"
-					}
-				},
-				text="Hits against Marked enemy cause {0}% less Freeze buildup"
-			},
-			[4]={
-				limit={
-					[1]={
-						[1]=1,
-						[2]="#"
-					},
-					[2]={
-						[1]=0,
-						[2]=0
-					}
-				},
-				text="Hits against Marked enemy cause {0:+d}% more Freeze buildup"
+				text="Buff grants {0}% of damage Gained as Cold damage"
 			}
 		},
 		stats={
-			[1]="freezing_mark_hit_damage_freeze_multiplier_+%_final",
-			[2]="quality_display_freezing_mark_is_gem"
+			[1]="freezing_mark_damage_buff_damage_%_to_gain_as_cold"
 		}
 	},
 	[6]={
 		[1]={
+		},
+		stats={
+			[1]="secondary_skill_effect_duration"
+		}
+	},
+	[7]={
+		[1]={
+		},
+		stats={
+			[1]="skill_effect_duration"
+		}
+	},
+	[8]={
+		[1]={
 			[1]={
+				[1]={
+					k="milliseconds_to_seconds_2dp_if_required",
+					v=1
+				},
+				limit={
+					[1]={
+						[1]=1000,
+						[2]=1000
+					}
+				},
+				text="Buff duration is {0} second"
+			},
+			[2]={
 				[1]={
 					k="milliseconds_to_seconds_2dp_if_required",
 					v=1
@@ -170,19 +163,20 @@ return {
 						[2]="#"
 					}
 				},
-				text="Mark duration {0}s"
+				text="Buff duration is {0} seconds"
 			}
 		},
 		stats={
-			[1]="skill_effect_duration"
+			[1]="base_secondary_skill_effect_duration"
 		}
 	},
-	["active_skill_area_of_effect_radius"]=2,
-	["active_skill_base_area_of_effect_radius"]=3,
-	["base_secondary_skill_effect_duration"]=1,
+	["active_skill_show_freeze_range_from_freezing_mark"]=3,
+	["base_secondary_skill_effect_duration"]=8,
 	["base_skill_effect_duration"]=4,
-	["freezing_mark_hit_damage_freeze_multiplier_+%_final"]=5,
+	["freezing_mark_damage_buff_damage_%_to_gain_as_cold"]=5,
+	["freezing_mark_hit_damage_freeze_multiplier_+%_final"]=2,
 	parent="skill_stat_descriptions",
-	["quality_display_freezing_mark_is_gem"]=5,
-	["skill_effect_duration"]=6
+	["quality_display_freezing_mark_is_gem"]=2,
+	["secondary_skill_effect_duration"]=6,
+	["skill_effect_duration"]=7
 }

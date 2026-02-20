@@ -5,12 +5,18 @@ return {
 [[
 The Adorned
 Diamond
+Source: Drops from unique{Trialmaster} in normal{The Trial of Chaos}
+Variant: Pre 0.4.0
+Variant: Current
 Limited to: 1
-(0-100)% increased Effect of Jewel Socket Passive Skills
-containing Corrupted Magic Jewels
+{variant:1}(0-100)% increased Effect of Jewel Socket Passive Skills
+{variant:2}(0-150)% increased Effect of Jewel Socket Passive Skills
+{variant:1}containing Corrupted Magic Jewels
+{variant:2}containing Corrupted Magic Jewels
 ]],[[
 Controlled Metamorphosis
 Diamond
+Source: Drops from unique{Xesht, We That Are One} in normal{Twisted Domain}
 Variant: Very Small Ring
 Variant: Small Ring
 Variant: Medium-Small Ring
@@ -47,13 +53,17 @@ Limited to: 3
 [[
 Grand Spectrum
 Sapphire
+Variant: Pre 0.4.0
+Variant: Current
 Limited to: 3
-+4% to all Elemental Resistances per socketed Grand Spectrum
+{variant:1}+4% to all Elemental Resistances per socketed Grand Spectrum
+{variant:2}+6% to all Elemental Resistances per socketed Grand Spectrum
 ]],
 -- Jewel: Timeless
 [[
 Heroic Tragedy
 Timeless Jewel
+Source: Drops from unique{Olroth, Origin of the Fall}
 Limited to: 1 Historic
 Variant: Vorana
 Variant: Medved
@@ -63,6 +73,25 @@ Radius: Very Large
 {variant:2}Remembrancing (100-8000) songworthy deeds by the line of Medved
 {variant:3}Remembrancing (100-8000) songworthy deeds by the line of Olroth
 Passives in radius are Conquered by the Kalguur
+Historic
+]],
+[[
+Undying Hate
+Timeless Jewel
+Source: Drops from unique{Vessel of Kulemak}
+Limited to: 1 Historic
+Variant: Amanamu
+Variant: Kulemak
+Variant: Kurgal
+Variant: Tecrod
+Variant: Ulaman
+Radius: Very Large
+{variant:1}Glorifying the defilement of (100-8000) souls in tribute to Amanamu
+{variant:2}Glorifying the defilement of (100-8000) souls in tribute to Kulemak
+{variant:3}Glorifying the defilement of (100-8000) souls in tribute to Kurgal
+{variant:4}Glorifying the defilement of (100-8000) souls in tribute to Tecrod
+{variant:5}Glorifying the defilement of (100-8000) souls in tribute to Ulaman
+Passives in radius are Conquered by the Abyssals
 Historic
 ]],
 }
