@@ -17,13 +17,42 @@ end
 
 math.randomseed(os.time())
 
+local REALISTIC_MODE = os.getenv("POB2_AI_REALISTIC_MODE") == "1"
+
+local function envNumber(name)
+	local raw = os.getenv(name)
+	if not raw then
+		return nil
+	end
+	return tonumber(raw)
+end
+
+local DPS_WEIGHT = tonumber(os.getenv("POB2_AI_DPS_WEIGHT")) or 90
+local LIFE_WEIGHT = tonumber(os.getenv("POB2_AI_LIFE_WEIGHT")) or 35
+local HIT_WEIGHT = tonumber(os.getenv("POB2_AI_HIT_WEIGHT")) or 20
+local MIN_LIFE_FLOOR = tonumber(os.getenv("POB2_AI_MIN_LIFE")) or 150
+local MIN_HIT_FLOOR = tonumber(os.getenv("POB2_AI_MIN_MAXHIT")) or 150
+local LIFE_FLOOR_PENALTY = tonumber(os.getenv("POB2_AI_LIFE_PENALTY")) or 100
+local HIT_FLOOR_PENALTY = tonumber(os.getenv("POB2_AI_HIT_PENALTY")) or 80
+local SPELL_DAMAGE_MAX = envNumber("POB2_AI_MAX_SPELL_DAMAGE") or (REALISTIC_MODE and 240 or 420)
+local ELEMENTAL_DAMAGE_MAX = envNumber("POB2_AI_MAX_ELEMENTAL_DAMAGE") or (REALISTIC_MODE and 220 or 420)
+local CRIT_BONUS_MAX = envNumber("POB2_AI_MAX_CRIT_BONUS") or (REALISTIC_MODE and 280 or 520)
+local LIFE_MAX = envNumber("POB2_AI_MAX_LIFE") or (REALISTIC_MODE and 220 or 320)
+local MANA_MAX = envNumber("POB2_AI_MAX_MANA") or (REALISTIC_MODE and 220 or 360)
+
+local SPELL_DAMAGE_MIN = REALISTIC_MODE and 15 or 30
+local ELEMENTAL_DAMAGE_MIN = REALISTIC_MODE and 10 or 20
+local CRIT_BONUS_MIN = REALISTIC_MODE and 20 or 40
+local LIFE_MIN = REALISTIC_MODE and 20 or 20
+local MANA_MIN = REALISTIC_MODE and 20 or 20
+
 local function addItem(raw)
 	build.itemsTab:CreateDisplayItemFromRaw(raw)
 	build.itemsTab:AddDisplayItem()
 end
 
 local function addSkillSetup()
-	build.skillsTab:PasteSocketGroup("Lightning Arrow 20/0  1\nMartial Tempo 20/0  1\n")
+	build.skillsTab:PasteSocketGroup("Spark 20/0  1\n")
 end
 
 local function pickDps(output)
@@ -41,16 +70,23 @@ local function evaluateBuild(label, cfg)
 
 	addItem(string.format([[
 New Item
-Heavy Bow
-%d%% increased attack damage
+Withered Wand
+%d%% increased spell damage
 %d%% increased Critical Damage Bonus
-]], cfg.attackDamageInc, cfg.critBonus))
+]], cfg.spellDamageInc, cfg.critBonus))
 
 	addItem(string.format([[
 New Item
 Ring
 +%d to maximum life
 ]], cfg.flatLife))
+
+	addItem(string.format([[
+New Item
+Twig Focus
+%d%% increased Elemental Damage
++%d to maximum Mana
+]], cfg.elementalDamageInc, cfg.flatMana))
 
 	if cfg.customMods and #cfg.customMods > 0 then
 		build.configTab.input.customMods = cfg.customMods
@@ -67,7 +103,17 @@ Ring
 	local life = output.Life or 0
 	local physMaxHit = calcsOutput.PhysicalMaximumHitTaken or 0
 
-	local score = dps + (life * 120) + (physMaxHit * 80)
+	local lifePenalty = 0
+	if life < MIN_LIFE_FLOOR then
+		lifePenalty = (MIN_LIFE_FLOOR - life) * LIFE_FLOOR_PENALTY
+	end
+
+	local hitPenalty = 0
+	if physMaxHit < MIN_HIT_FLOOR then
+		hitPenalty = (MIN_HIT_FLOOR - physMaxHit) * HIT_FLOOR_PENALTY
+	end
+
+	local score = (dps * DPS_WEIGHT) + (life * LIFE_WEIGHT) + (physMaxHit * HIT_WEIGHT) - lifePenalty - hitPenalty
 
 	return {
 		label = label,
@@ -96,23 +142,29 @@ end
 local humanBaselines = {
 	{
 		label = "human_noob",
-		attackDamageInc = 20,
+		spellDamageInc = 20,
+		elementalDamageInc = 20,
 		critBonus = 25,
 		flatLife = 20,
+		flatMana = 20,
 		customMods = "",
 	},
 	{
 		label = "human_mid",
-		attackDamageInc = 80,
+		spellDamageInc = 80,
+		elementalDamageInc = 70,
 		critBonus = 90,
 		flatLife = 60,
+		flatMana = 60,
 		customMods = "+20% to all elemental resistances",
 	},
 	{
 		label = "human_endgame",
-		attackDamageInc = 160,
+		spellDamageInc = 160,
+		elementalDamageInc = 140,
 		critBonus = 180,
 		flatLife = 120,
+		flatMana = 120,
 		customMods = "+60% to all elemental resistances\n+20% to chaos resistance",
 	},
 }
@@ -121,7 +173,25 @@ local availableCustomMods = {
 	"+20% to all elemental resistances",
 	"+20% to chaos resistance",
 	"10% increased Movement Speed",
-	"10% increased attack speed",
+	"10% increased Cast Speed",
+	"20% increased Spell Damage",
+	"20% increased Lightning Damage",
+	"20% increased Critical Hit Chance for Spells",
+	"15% increased Mana Regeneration Rate",
+}
+
+local realisticOffensiveMods = {
+	"10% increased Cast Speed",
+	"20% increased Spell Damage",
+	"20% increased Lightning Damage",
+	"20% increased Critical Hit Chance for Spells",
+}
+
+local realisticUtilityMods = {
+	"+20% to all elemental resistances",
+	"+20% to chaos resistance",
+	"10% increased Movement Speed",
+	"15% increased Mana Regeneration Rate",
 }
 
 local function joinMods(mods)
@@ -132,6 +202,24 @@ local function joinMods(mods)
 end
 
 local function randomCustomMods()
+	if REALISTIC_MODE then
+		local selected = {}
+		if math.random() < 0.6 then
+			selected[#selected + 1] = realisticOffensiveMods[math.random(1, #realisticOffensiveMods)]
+		end
+		if math.random() < 0.55 then
+			selected[#selected + 1] = realisticUtilityMods[math.random(1, #realisticUtilityMods)]
+		end
+		if #selected == 0 and math.random() < 0.35 then
+			if math.random() < 0.5 then
+				selected[1] = realisticOffensiveMods[math.random(1, #realisticOffensiveMods)]
+			else
+				selected[1] = realisticUtilityMods[math.random(1, #realisticUtilityMods)]
+			end
+		end
+		return joinMods(selected)
+	end
+
 	local selected = {}
 	for i = 1, #availableCustomMods do
 		if math.random() < 0.33 then
@@ -146,41 +234,45 @@ end
 
 local function randomCandidate()
 	return {
-		attackDamageInc = math.random(10, 220),
-		critBonus = math.random(20, 260),
-		flatLife = math.random(10, 180),
+		spellDamageInc = math.random(SPELL_DAMAGE_MIN, SPELL_DAMAGE_MAX),
+		elementalDamageInc = math.random(ELEMENTAL_DAMAGE_MIN, ELEMENTAL_DAMAGE_MAX),
+		critBonus = math.random(CRIT_BONUS_MIN, CRIT_BONUS_MAX),
+		flatLife = math.random(LIFE_MIN, LIFE_MAX),
+		flatMana = math.random(MANA_MIN, MANA_MAX),
 		customMods = randomCustomMods(),
 	}
 end
 
 local function crossoverCandidate(a, b)
 	return {
-		attackDamageInc = (math.random() < 0.5) and a.attackDamageInc or b.attackDamageInc,
+		spellDamageInc = (math.random() < 0.5) and a.spellDamageInc or b.spellDamageInc,
+		elementalDamageInc = (math.random() < 0.5) and a.elementalDamageInc or b.elementalDamageInc,
 		critBonus = (math.random() < 0.5) and a.critBonus or b.critBonus,
 		flatLife = (math.random() < 0.5) and a.flatLife or b.flatLife,
+		flatMana = (math.random() < 0.5) and a.flatMana or b.flatMana,
 		customMods = (math.random() < 0.5) and a.customMods or b.customMods,
 	}
 end
 
 local function mutateCandidate(parent)
 	local nextCfg = clone(parent)
-	nextCfg.attackDamageInc = clamp(nextCfg.attackDamageInc + math.random(-18, 18), 10, 240)
-	nextCfg.critBonus = clamp(nextCfg.critBonus + math.random(-24, 24), 20, 280)
-	nextCfg.flatLife = clamp(nextCfg.flatLife + math.random(-14, 14), 10, 220)
+	local statDelta = REALISTIC_MODE and 22 or 40
+	local critDelta = REALISTIC_MODE and 26 or 50
+	local lifeDelta = REALISTIC_MODE and 16 or 28
+	local manaDelta = REALISTIC_MODE and 18 or 30
+	nextCfg.spellDamageInc = clamp(nextCfg.spellDamageInc + math.random(-statDelta, statDelta), SPELL_DAMAGE_MIN, SPELL_DAMAGE_MAX)
+	nextCfg.elementalDamageInc = clamp(nextCfg.elementalDamageInc + math.random(-statDelta, statDelta), ELEMENTAL_DAMAGE_MIN, ELEMENTAL_DAMAGE_MAX)
+	nextCfg.critBonus = clamp(nextCfg.critBonus + math.random(-critDelta, critDelta), CRIT_BONUS_MIN, CRIT_BONUS_MAX)
+	nextCfg.flatLife = clamp(nextCfg.flatLife + math.random(-lifeDelta, lifeDelta), LIFE_MIN, LIFE_MAX)
+	nextCfg.flatMana = clamp(nextCfg.flatMana + math.random(-manaDelta, manaDelta), MANA_MIN, MANA_MAX)
 	if math.random() < 0.2 then
 		nextCfg.customMods = randomCustomMods()
 	end
 	return nextCfg
 end
 
-local function runEvolution()
-	local generations = tonumber(os.getenv("POB2_AI_GENERATIONS")) or 8
-	local populationSize = tonumber(os.getenv("POB2_AI_POPULATION")) or 24
-	local eliteSize = tonumber(os.getenv("POB2_AI_ELITES")) or 6
-
-	if eliteSize > populationSize then
-		eliteSize = populationSize
-	end
+local function runEvolutionAttempt(generations, populationSize, eliteSize, attemptLabel)
+	print(string.format("[AIBattleRunner] Evolution attempt %s", attemptLabel))
 
 	local population = {}
 	for i = 1, populationSize do
@@ -193,7 +285,7 @@ local function runEvolution()
 		print(string.format("[AIBattleRunner] Generation %d/%d", g, generations))
 		local scored = {}
 		for i = 1, #population do
-			scored[i] = evaluateBuild("ai_g" .. g .. "_" .. i, population[i])
+			scored[i] = evaluateBuild("ai_" .. attemptLabel .. "_g" .. g .. "_" .. i, population[i])
 		end
 
 		table.sort(scored, function(a, b)
@@ -217,6 +309,30 @@ local function runEvolution()
 		end
 
 		population = nextPopulation
+	end
+
+	return bestResult
+end
+
+local function runEvolution()
+	local generations = tonumber(os.getenv("POB2_AI_GENERATIONS")) or 8
+	local populationSize = tonumber(os.getenv("POB2_AI_POPULATION")) or 24
+	local eliteSize = tonumber(os.getenv("POB2_AI_ELITES")) or 6
+	local restarts = tonumber(os.getenv("POB2_AI_RESTARTS")) or 3
+
+	if eliteSize > populationSize then
+		eliteSize = populationSize
+	end
+	if restarts < 1 then
+		restarts = 1
+	end
+
+	local bestResult = nil
+	for attempt = 1, restarts do
+		local candidate = runEvolutionAttempt(generations, populationSize, eliteSize, tostring(attempt))
+		if candidate and (not bestResult or candidate.score > bestResult.score) then
+			bestResult = candidate
+		end
 	end
 
 	return bestResult
@@ -314,6 +430,14 @@ print(
 
 local report = {
 	generatedAt = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+	realisticMode = REALISTIC_MODE,
+	constraints = {
+		spellDamageMax = SPELL_DAMAGE_MAX,
+		elementalDamageMax = ELEMENTAL_DAMAGE_MAX,
+		critBonusMax = CRIT_BONUS_MAX,
+		lifeMax = LIFE_MAX,
+		manaMax = MANA_MAX,
+	},
 	winner = winner,
 	leadPercent = leadPercent,
 	bestHuman = bestHuman,
@@ -322,12 +446,19 @@ local report = {
 }
 
 local root = "../.."
-local outPath = root .. "/poe2/public/data/ai-build-battle-pob2.json"
-local file = io.open(outPath, "w")
-if file then
-	file:write(encodeJson(report))
-	file:close()
-	print("Saved report: " .. outPath)
-else
-	print("Could not write report to: " .. outPath)
+local outputPaths = {
+	root .. "/poe2/public/data/ai-build-battle-pob2.json",
+	"Builds/ai-build-battle-pob2.json",
+}
+
+for i = 1, #outputPaths do
+	local outPath = outputPaths[i]
+	local file = io.open(outPath, "w")
+	if file then
+		file:write(encodeJson(report))
+		file:close()
+		print("Saved report: " .. outPath)
+	else
+		print("Could not write report to: " .. outPath)
+	end
 end
