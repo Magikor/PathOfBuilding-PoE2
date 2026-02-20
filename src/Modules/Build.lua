@@ -108,7 +108,14 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 	end)
 	self.controls.buildName = new("Control", {"LEFT",self.controls.back,"RIGHT"}, {8, 0, 0, 20})
 	self.controls.buildName.width = function(control)
-		local limit = self.anchorTopBarRight:GetPos() - 98 - 40 - self.controls.back:GetSize() - self.controls.save:GetSize() - self.controls.saveAs:GetSize()
+		local aiBattleWidth = self.controls.aiBattle and self.controls.aiBattle:GetSize() or 0
+		local limit = self.anchorTopBarRight:GetPos()
+			- 98
+			- 40
+			- self.controls.back:GetSize()
+			- self.controls.save:GetSize()
+			- self.controls.saveAs:GetSize()
+			- aiBattleWidth
 		local bnw = DrawStringWidth(16, "VAR", self.buildName)
 		self.strWidth = m_min(bnw, limit)
 		self.strLimited = bnw > limit
@@ -149,6 +156,136 @@ function buildMode:Init(dbFileName, buildName, buildXML, convertBuild, importLin
 	self.controls.saveAs.enabled = function()
 		return self.dbFileName
 	end
+	self.aiBattleRunning = false
+	self.controls.aiBattle = new("ButtonControl", {"LEFT",self.controls.saveAs,"RIGHT"}, {8, 0, 76, 20}, function()
+		return self.aiBattleRunning and "Running" or "AI Battle"
+	end, function()
+		if self.aiBattleRunning then
+			return
+		end
+		local profileConfigs = {
+			Fast = {
+				generations = 4,
+				populationSize = 12,
+				eliteSize = 3,
+				topAscendanciesPerClass = 1,
+				perClassGenerations = 2,
+				perClassPopulation = 8,
+				perClassElite = 2,
+			},
+			Balanced = {
+				generations = 6,
+				populationSize = 18,
+				eliteSize = 5,
+				topAscendanciesPerClass = 2,
+				perClassGenerations = 4,
+				perClassPopulation = 14,
+				perClassElite = 4,
+			},
+			Deep = {
+				generations = 10,
+				populationSize = 30,
+				eliteSize = 8,
+				topAscendanciesPerClass = 3,
+				perClassGenerations = 6,
+				perClassPopulation = 18,
+				perClassElite = 5,
+			},
+		}
+
+		local function runProfile(profileName)
+			local profileOptions = profileConfigs[profileName] or profileConfigs.Balanced
+			self.aiBattleRunning = true
+			local ok, reportOrErr, outPathOrErr = pcall(function()
+				local report, runErr = aiBattleLib:Run(self, profileOptions)
+				if not report then
+					return nil, runErr or "AI battle failed"
+				end
+				local outPath = (main.buildPath or "") .. "ai-build-battle-pob2.json"
+				local saved, writeErr = aiBattleLib:SaveReport(report, outPath)
+				if not saved then
+					return nil, writeErr
+				end
+				return report, outPath
+			end)
+			self.aiBattleRunning = false
+
+			if not ok then
+				local errMsg = "Error while running AI battle (" .. tostring(profileName) .. "):\n"
+				main:OpenMessagePopup("AI Battle", errMsg .. tostring(reportOrErr))
+				return
+			end
+
+			if not reportOrErr then
+				main:OpenMessagePopup("AI Battle", "AI battle failed:\n" .. tostring(outPathOrErr or "Unknown error"))
+				return
+			end
+
+			local report = reportOrErr
+			local bestClassName = (report.bestClass and report.bestClass.className) or "Unknown"
+			local bestAscendName = (report.bestClass and report.bestClass.ascendClassName) or "None"
+			local bestLoadout = report.bestLoadout or { }
+			local bestWeapon = bestLoadout.weaponBase or "-"
+			local bestArchetype = bestLoadout.archetypeName or "-"
+			local popupFmt =
+				"Profile: %s\nWinner: %s\nLead: %.2f%%\n\nBest Class: %s (%s)\n"
+				.. "Best Archetype: %s\nBest Weapon: %s\n"
+				.. "Best Human: %s (%.2f)\nBest AI: %s (%.2f)\n\n"
+				.. "Saved report:\n%s\n\nApply best class to current build?"
+			local msg = string.format(
+				popupFmt,
+				tostring(profileName),
+				report.winner or "-",
+				report.leadPercent or 0,
+				bestClassName,
+				bestAscendName,
+				bestArchetype,
+				bestWeapon,
+				report.bestHuman and report.bestHuman.label or "-",
+				report.bestHuman and report.bestHuman.score or 0,
+				report.bestAI and report.bestAI.label or "-",
+				report.bestAI and report.bestAI.score or 0,
+				tostring(outPathOrErr)
+			)
+			main:OpenConfirmPopup("AI Battle Complete", msg, "Apply Best Class", function()
+				local bestClass = report.bestClass
+				if not bestClass then
+					main:OpenMessagePopup("AI Battle", "Best class data is missing from AI report.")
+					return
+				end
+
+				if self.spec:CountAllocNodes() > 0 and not self.spec:IsClassConnected(bestClass.classId) then
+					self.spec:ConnectToClass(bestClass.classId)
+				end
+
+				self.spec:SelectClass(bestClass.classId)
+				self.spec:SelectAscendClass(bestClass.ascendClassId)
+				self.spec:AddUndoState()
+				self.spec:SetWindowTitleWithBuildClass()
+				self.buildFlag = true
+				self.treeTab.viewer.searchNeedsForceUpdate = true
+			end)
+		end
+
+		local controls = { }
+		controls.label = new("LabelControl", nil, {0, 20, 0, 16}, "^7Choose AI run profile:")
+		controls.fast = new("ButtonControl", nil, {-115, 70, 70, 20}, "Fast", function()
+			main:ClosePopup()
+			runProfile("Fast")
+		end)
+		controls.balanced = new("ButtonControl", nil, {-35, 70, 80, 20}, "Balanced", function()
+			main:ClosePopup()
+			runProfile("Balanced")
+		end)
+		controls.deep = new("ButtonControl", nil, {55, 70, 70, 20}, "Deep", function()
+			main:ClosePopup()
+			runProfile("Deep")
+		end)
+		controls.cancel = new("ButtonControl", nil, {0, 100, 70, 20}, "Cancel", function()
+			main:ClosePopup()
+		end)
+		main:OpenPopup(340, 130, "AI Battle Profile", controls, "balanced", "balanced", "cancel")
+	end)
 
 	-- Controls: top bar, right side
 	self.anchorTopBarRight = new("Control", nil, {function() return main.screenW / 2 + 6 end, 4, 0, 20})
